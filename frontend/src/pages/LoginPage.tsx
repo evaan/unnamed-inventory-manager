@@ -11,10 +11,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+    <div className="bg-gray-100 flex items-center justify-center rounded-2xl p-4">
+      <div className="max-w-md w-full bg-white flex rounded-2xl shadow-xl p-8 border border-gray-100">
         <div className="text-center mb-8">
-          <div className="inline-flex bg-indigo-50 p-3 rounded-full text-indigo-600 mb-3">
+          <div className="inline-flex bg-teal-50 p-3 rounded-full text-teal-600 mb-3">
             <Package className="w-8 h-8" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Welcome Back</h2>
@@ -28,7 +28,7 @@ export default function LoginPage() {
               type="email"
               required
               placeholder="admin@example.com"
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm"
+              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all text-sm"
             />
           </div>
           <div>
@@ -37,12 +37,12 @@ export default function LoginPage() {
               type="password"
               required
               placeholder="••••••••"
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-sm"
+              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all text-sm"
             />
           </div>
           <button
             type="submit"
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg transition-colors shadow-sm"
+            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium py-2.5 rounded-lg transition-colors shadow-sm"
           >
             Sign In
           </button>
