@@ -1,12 +1,28 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import AppRoutes from './routes/AppRoutes'
+import { useState } from 'react';
+import { LoginPage } from './pages/LoginPage';
+import { MainPage } from './pages/MainPage';
 
 function App() {
+  const [token, setToken] = useState<string | null>(() => {
+    // Check localStorage so refreshing the page doesn't log you out
+    return localStorage.getItem('google_token');
+  });
 
-  return <AppRoutes />
+  const handleLogin = (accessToken: string) => {
+    localStorage.setItem('google_token', accessToken);
+    setToken(accessToken);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('google_token');
+    setToken(null);
+  };
+
+  if (!token) {
+    return <LoginPage onLoginSuccess={handleLogin} />;
+  }
+
+  return <MainPage token={token} onLogout={handleLogout} />;
 }
 
-export default App
+export default App;
