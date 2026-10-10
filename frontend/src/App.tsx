@@ -4,7 +4,6 @@ import { MainPage } from './pages/MainPage';
 
 function App() {
   const [token, setToken] = useState<string | null>(() => {
-    // Check localStorage so refreshing the page doesn't log you out
     return localStorage.getItem('google_token');
   });
 
