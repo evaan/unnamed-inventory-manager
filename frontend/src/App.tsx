@@ -17,9 +17,9 @@ function App() {
     setToken(null);
   };
 
-  if (!token) {
-    return <LoginPage onLoginSuccess={handleLogin} />;
-  }
+  //if (!token) {
+  //  return <LoginPage onLoginSuccess={handleLogin} />;
+  //}
 
   return <MainPage token={token} onLogout={handleLogout} />;
 }
