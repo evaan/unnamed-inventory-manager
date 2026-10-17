@@ -6,17 +6,17 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/evaan/unnamed-inventory-manager/auth"
-	"github.com/evaan/unnamed-inventory-manager/util"
+	"github.com/evaan/unnamed-inventory-manager/Login-Server/auth"
+	"github.com/evaan/unnamed-inventory-manager/Login-Server/util"
+	"github.com/evaan/unnamed-inventory-manager/Shared/sharedAuth"
+	"github.com/evaan/unnamed-inventory-manager/Shared/sharedDatabase"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
 func main() {
-	db, err := gorm.Open(postgres.Open(os.Getenv("POSTGRES_URL")), &gorm.Config{})
+	db, err := sharedDatabase.Connect()
 	if err != nil {
 		log.Fatalf("Error connecting to database: %s", err)
 	}
@@ -42,7 +42,7 @@ func main() {
 	}
 
 	router := gin.Default()
-	router.Use(auth.CORSMiddleware(frontend.Scheme + "://" + frontend.Host))
+	router.Use(sharedAuth.CORSMiddleware(frontend.Scheme + "://" + frontend.Host))
 
 	err = router.SetTrustedProxies([]string{
 		"127.0.0.1",

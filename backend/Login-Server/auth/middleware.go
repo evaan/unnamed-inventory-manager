@@ -5,20 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/evaan/unnamed-inventory-manager/util"
-	"github.com/gin-contrib/cors"
+	"github.com/evaan/unnamed-inventory-manager/Login-Server/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
-
-func CORSMiddleware(frontendURL string) gin.HandlerFunc {
-	return cors.New(cors.Config{
-		AllowOrigins:     []string{frontendURL},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
-		AllowHeaders:     []string{"Content-Type"},
-		AllowCredentials: true,
-	})
-}
 
 func AuthOptional(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
