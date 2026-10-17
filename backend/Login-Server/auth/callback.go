@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/evaan/unnamed-inventory-manager/util"
+	"github.com/evaan/unnamed-inventory-manager/Login-Server/util"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"

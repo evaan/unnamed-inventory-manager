@@ -3,7 +3,7 @@ package auth
 import (
 	"net/http"
 
-	"github.com/evaan/unnamed-inventory-manager/util"
+	"github.com/evaan/unnamed-inventory-manager/Login-Server/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
