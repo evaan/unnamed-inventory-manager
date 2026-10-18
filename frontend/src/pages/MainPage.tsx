@@ -14,9 +14,12 @@ import {
   Pencil,
   Plus,
 } from 'lucide-react';
+import type { AuthState } from '../features/auth/auth';
+
+type LoggedIn = Extract<AuthState, { loggedIn: true }>;
 
 interface MainPageProps {
-  token: string;
+  user: LoggedIn;
   onLogout: () => void;
 }
 
@@ -27,14 +30,14 @@ interface Item {
   name: string;
   partNumber: string;
   category: string;
-  location: string; // cabinet / shelf
-  bin: string; // drawer / bin within the location
+  location: string;
+  bin: string;
   quantity: number;
-  minQuantity: number; // reorder point
+  minQuantity: number;
   unit: string;
   unitCost: number;
   supplier: string;
-  specs: Record<string, string>; // free-form, shown in the spotlight panel
+  specs: Record<string, string>;
   notes?: string;
   updated: string;
 }
@@ -260,9 +263,6 @@ const fromDraft = (d: Draft): Partial<Item> => ({
   ),
 });
 
-// Existing values offered as autocomplete while typing in the edit form.
-type Suggestions = Record<'category' | 'location' | 'bin' | 'supplier' | 'unit', string[]>;
-
 const INPUT =
   'w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm placeholder:text-slate-600 focus:outline-none focus:border-indigo-500';
 
@@ -307,14 +307,12 @@ const NotesSection = ({ value, onCommit }: { value: string; onCommit: (v: string
 const EditForm = ({
   item,
   isNew,
-  suggestions,
   onSave,
   onCancel,
   onNotes,
 }: {
   item: Item;
   isNew: boolean;
-  suggestions: Suggestions;
   onSave: (id: number, patch: Partial<Item>) => void;
   onCancel: () => void;
   onNotes: (notes: string) => void;
@@ -440,12 +438,6 @@ const EditForm = ({
         <NotesSection value={item.notes ?? ''} onCommit={onNotes} />
 
         {error && <p className="text-sm text-rose-300">{error}</p>}
-
-        {datalist('dl-category', suggestions.category)}
-        {datalist('dl-supplier', suggestions.supplier)}
-        {datalist('dl-location', suggestions.location)}
-        {datalist('dl-bin', suggestions.bin)}
-        {datalist('dl-unit', suggestions.unit)}
       </div>
 
       <div className="px-5 py-3 border-t border-slate-800 flex justify-end gap-2">
@@ -472,7 +464,6 @@ interface SpotlightProps {
   item: Item;
   isEditing: boolean;
   isNew: boolean;
-  suggestions: Suggestions;
   onClose: () => void;
   onEdit: () => void;
   onCancel: () => void;
@@ -485,7 +476,6 @@ const SpotlightPanel = ({
   item,
   isEditing,
   isNew,
-  suggestions,
   onClose,
   onEdit,
   onCancel,
@@ -536,7 +526,6 @@ const SpotlightPanel = ({
         <EditForm
           item={item}
           isNew={isNew}
-          suggestions={suggestions}
           onSave={onSave}
           onCancel={onCancel}
           onNotes={(notes) => onNotes(item.id, notes)}
@@ -626,7 +615,7 @@ const SpotlightPanel = ({
 
 
 /* ---------- Page ---------- */
-export const MainPage = ({ token, onLogout }: MainPageProps) => {
+export const MainPage = ({ user, onLogout }: MainPageProps) => {
   /* Sidebar layout */
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -661,8 +650,8 @@ export const MainPage = ({ token, onLogout }: MainPageProps) => {
 
   /* Spotlight + editing */
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null); // item in edit mode
-  const [newItemId, setNewItemId] = useState<number | null>(null); // unsaved new item, if any
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [newItemId, setNewItemId] = useState<number | null>(null);
   const spotlightItem = items.find((i) => i.id === selectedId) ?? null;
 
   // Drops an unsaved new item. Nothing has been sent to the API yet, so this is purely local.
@@ -745,23 +734,12 @@ export const MainPage = ({ token, onLogout }: MainPageProps) => {
     setNewItemId(id);
   };
 
-  const suggestions = useMemo<Suggestions>(() => {
-    const uniq = (pick: (i: Item) => string) => [...new Set(items.map(pick).filter(Boolean))].sort();
-    return {
-      category: uniq((i) => i.category),
-      location: uniq((i) => i.location),
-      bin: uniq((i) => i.bin),
-      supplier: uniq((i) => i.supplier),
-      unit: uniq((i) => i.unit),
-    };
-  }, [items]);
-
   const options = useMemo(() => {
     const result = {} as Record<FilterKey, { value: string; count: number }[]>;
     for (const { key, order } of FILTER_GROUPS) {
       const counts = new Map<string, number>();
       items.forEach((item) => {
-        if (item.id === newItemId) return; // unsaved draft doesn't count yet
+        if (item.id === newItemId) return;
         const v = getFilterValue(item, key);
         counts.set(v, (counts.get(v) ?? 0) + 1);
       });
@@ -778,7 +756,7 @@ export const MainPage = ({ token, onLogout }: MainPageProps) => {
   const visibleItems = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter((item) => {
-      if (item.id === newItemId) return true; // keep the draft visible while it's being filled in
+      if (item.id === newItemId) return true;
       const matchesQuery =
         !q ||
         item.name.toLowerCase().includes(q) ||
@@ -1049,7 +1027,6 @@ export const MainPage = ({ token, onLogout }: MainPageProps) => {
               item={spotlightItem}
               isEditing={editingId === spotlightItem.id}
               isNew={newItemId === spotlightItem.id}
-              suggestions={suggestions}
               onClose={() => selectItem(null)}
               onEdit={() => setEditingId(spotlightItem.id)}
               onCancel={cancelEdit}

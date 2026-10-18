@@ -1,27 +1,18 @@
-import { useState } from 'react';
+// App.tsx
+import { useAuth } from './features/auth/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { MainPage } from './pages/MainPage';
 
 function App() {
-  const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem('google_token');
-  });
+  const { auth, loading, login, logout } = useAuth();
 
-  const handleLogin = (accessToken: string) => {
-    localStorage.setItem('google_token', accessToken);
-    setToken(accessToken);
-  };
+  if (loading) return <p>Loading...</p>;
 
-  const handleLogout = () => {
-    localStorage.removeItem('google_token');
-    setToken(null);
-  };
+  if (!auth?.loggedIn) {
+    return <LoginPage onLogin={login} />;
+  }
 
-  //if (!token) {
-  //  return <LoginPage onLoginSuccess={handleLogin} />;
-  //}
-
-  return <MainPage token={token} onLogout={handleLogout} />;
+  return <MainPage user={auth} onLogout={logout} />;
 }
 
 export default App;
