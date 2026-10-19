@@ -121,6 +121,10 @@ func main() {
 		admin.PUT("/permissions/:id", func(c *gin.Context) {
 			auth.PutPermissions(c, db)
 		})
+
+		admin.PATCH("/users/:id", func(c *gin.Context) {
+			auth.PatchUser(c, db)
+		})
 	}
 
 	if err := router.Run(":8080"); err != nil {

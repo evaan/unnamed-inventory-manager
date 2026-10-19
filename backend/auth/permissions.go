@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -55,7 +54,6 @@ func GetPermissionsFromId(c *gin.Context, db *gorm.DB) {
 }
 
 func PutPermissions(c *gin.Context, db *gorm.DB) {
-	db = db.WithContext(c.Request.Context())
 	userID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
@@ -68,48 +66,26 @@ func PutPermissions(c *gin.Context, db *gorm.DB) {
 		return
 	}
 
-	actor, err := GetUser(c)
+	exists, err := DoesUserExist(db, userID.String())
 	if err != nil {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	if !exists {
+		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
 
 	permissions := make([]UserPermission, 0, len(req.Permissions))
-	seen := make(map[string]bool, len(req.Permissions))
-
 	for _, permission := range req.Permissions {
-		if permission != PermissionAdministrator || seen[permission] {
-			c.AbortWithStatus(http.StatusBadRequest)
-			return
-		}
-		seen[permission] = true
 		permissions = append(permissions, UserPermission{
 			UserID:     userID,
 			Permission: permission,
 		})
 	}
 
-	status := http.StatusInternalServerError
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := lockPermissions(tx); err != nil {
-			return err
-		}
-		isAdmin, err := IsAdmin(tx, actor)
-		if err != nil {
-			return err
-		}
-		if !isAdmin {
-			status = http.StatusForbidden
-			return errors.New("administrator permission required")
-		}
-		exists, err := DoesUserExist(tx, userID.String())
-		if err != nil {
-			return err
-		}
-		if !exists {
-			status = http.StatusNotFound
-			return gorm.ErrRecordNotFound
-		}
 		if err := tx.Where("user_id = ?", userID).
 			Delete(&UserPermission{}).Error; err != nil {
 			return err
@@ -121,22 +97,10 @@ func PutPermissions(c *gin.Context, db *gorm.DB) {
 			}
 		}
 
-		var administrators int64
-		if err := tx.Model(&UserPermission{}).
-			Joins("JOIN users ON users.id = user_permissions.user_id").
-			Where("permission = ? AND users.disabled = ?", PermissionAdministrator, false).
-			Count(&administrators).Error; err != nil {
-			return err
-		}
-		if administrators == 0 {
-			status = http.StatusConflict
-			return errors.New("cannot remove the last enabled administrator")
-		}
-
 		return nil
 	})
 	if err != nil {
-		c.AbortWithError(status, err)
+		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 

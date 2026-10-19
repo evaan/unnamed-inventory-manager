@@ -35,3 +35,7 @@ type UserPermission struct {
 type PutPermissionsRequest struct {
 	Permissions []string `json:"permissions" binding:"required"`
 }
+
+type PatchUserRequest struct {
+	Disabled *bool `json:"disabled" binding:"required"`
+}
