@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/evaan/unnamed-inventory-manager/Login-Server/util"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
@@ -61,21 +60,21 @@ func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL 
 	}
 
 	sessionToken := GenerateToken()
-	var user util.User
+	var user User
 	err = db.Where("email = ?", email).First(&user).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		user = util.User{ID: uuid.New(), Name: name, Email: email}
+		user = User{ID: uuid.New(), Name: name, Email: email}
 		if err := db.Create(&user).Error; err != nil {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
 		var count int64
-		if err := db.Model(&util.User{}).Count(&count).Error; err != nil {
+		if err := db.Model(&User{}).Count(&count).Error; err != nil {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
 		if count == 1 {
-			if err := db.Create(&util.UserPermission{UserID: user.ID, Permission: "Administrator"}).Error; err != nil {
+			if err := db.Create(&UserPermission{UserID: user.ID, Permission: "Administrator"}).Error; err != nil {
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
@@ -85,7 +84,7 @@ func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL 
 		return
 	}
 
-	if err := db.Create(&util.UserSession{
+	if err := db.Create(&UserSession{
 		UserID: user.ID, SessionToken: sessionToken, Expires: time.Now().Add(8 * time.Hour),
 	}).Error; err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)

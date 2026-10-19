@@ -3,7 +3,6 @@ package auth
 import (
 	"net/http"
 
-	"github.com/evaan/unnamed-inventory-manager/Login-Server/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -14,7 +13,7 @@ func Logout(c *gin.Context, db *gorm.DB) {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	if err := db.Where("session_token = ?", token).Delete(&util.UserSession{}).Error; err != nil {
+	if err := db.Where("session_token = ?", token).Delete(&UserSession{}).Error; err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}

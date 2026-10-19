@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/evaan/unnamed-inventory-manager/Login-Server/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -18,7 +17,7 @@ func AuthOptional(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		var session util.UserSession
+		var session UserSession
 		err = db.Where("session_token = ?", token).First(&session).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.Next()
@@ -38,7 +37,7 @@ func AuthOptional(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		var user util.User
+		var user User
 		err = db.First(&user, "id = ?", session.UserID).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.Next()
@@ -61,7 +60,7 @@ func AuthRequired(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		var session util.UserSession
+		var session UserSession
 		err = db.Where("session_token = ?", token).First(&session).Error
 		if err != nil {
 			status := http.StatusInternalServerError
@@ -78,7 +77,7 @@ func AuthRequired(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		var user util.User
+		var user User
 		err = db.First(&user, "id = ?", session.UserID).Error
 		if err != nil {
 			status := http.StatusInternalServerError
