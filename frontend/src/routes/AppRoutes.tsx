@@ -3,7 +3,6 @@ import LoginPage from '../pages/LoginPage';
 import MainPage from '../pages/MainPage';
 import AccountPage from '../pages/AccountPage';
 import SettingsPage from '../pages/SettingsPage';
-import SplashPage from '../pages/SplashPage';
 import AppLayout from '../layout/AppLayout';
 
 export default function AppRoutes() {
