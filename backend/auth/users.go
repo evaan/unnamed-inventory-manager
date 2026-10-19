@@ -8,6 +8,20 @@ import (
 	"gorm.io/gorm"
 )
 
+// @Summary		Update a user
+// @Description	Disable or enable a user. Admin only, using the session cookie
+// @Tags			Auth
+// @Accept			json
+// @Param			id		path	string				true	"User ID"	Format(uuid)
+// @Param			body	body	PatchUserRequest	true	"Whether the user is disabled"
+// @Param			Origin	header	string				false	"Frontend origin, required if Referer is not set"
+// @Success		204		"User updated"
+// @Failure		400		"Invalid user ID or request body"
+// @Failure		401		"Not logged in"
+// @Failure		403		"Not an administrator or invalid frontend Origin or Referer"
+// @Failure		404		"User not found"
+// @Failure		500		"Error updating user"
+// @Router			/users/{id} [patch]
 func PatchUser(c *gin.Context, db *gorm.DB) {
 	db = db.WithContext(c.Request.Context())
 

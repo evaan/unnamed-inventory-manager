@@ -7,6 +7,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// @Summary		Get the current user
+// @Description	Returns your name, email and permissions, or just loggedIn: false if you're not logged in
+// @Tags			Auth
+// @Produce		json
+// @Success		200	{object}	object{loggedIn=bool,name=string,email=string,permissions=[]string}	"Login status and user details"
+// @Failure		500	"Error getting current user"
+// @Router			/whoami [get]
 func WhoAmI(c *gin.Context, db *gorm.DB) {
 	user, err := GetUser(c)
 	if err != nil {
