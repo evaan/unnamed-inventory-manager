@@ -3,7 +3,7 @@ interface MainPageProps {
   onLogout: () => void;
 }
 
-export const MainPage = ({ token, onLogout }: MainPageProps) => {
+export const MainPage = ({ onLogout }: MainPageProps) => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <header className="flex justify-between items-center mb-6">
