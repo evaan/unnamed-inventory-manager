@@ -6,22 +6,22 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/evaan/unnamed-inventory-manager/Login-Server/auth"
-	"github.com/evaan/unnamed-inventory-manager/Login-Server/util"
-	"github.com/evaan/unnamed-inventory-manager/Shared/sharedAuth"
-	"github.com/evaan/unnamed-inventory-manager/Shared/sharedDatabase"
 	"github.com/gin-gonic/gin"
+	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
+	"gitlab.com/evaandev/unnamed-inventory-manager/database"
+	"gitlab.com/evaandev/unnamed-inventory-manager/inventory"
+	"gitlab.com/evaandev/unnamed-inventory-manager/middleware"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
 func main() {
-	db, err := sharedDatabase.Connect()
+	db, err := database.Connect()
 	if err != nil {
 		log.Fatalf("Error connecting to database: %s", err)
 	}
 
-	if err := db.AutoMigrate(&util.User{}, &util.UserSession{}, &util.UserPermission{}); err != nil {
+	if err := db.AutoMigrate(&auth.User{}, &auth.UserPermission{}, &auth.UserSession{}, &inventory.Item{}, &inventory.Changelog{}); err != nil {
 		log.Fatalf("Error migrating database: %s", err)
 	}
 
@@ -42,7 +42,7 @@ func main() {
 	}
 
 	router := gin.Default()
-	router.Use(sharedAuth.CORSMiddleware(frontend.Scheme + "://" + frontend.Host))
+	router.Use(middleware.CORS(frontend.Scheme + "://" + frontend.Host))
 
 	err = router.SetTrustedProxies([]string{
 		"127.0.0.1",
@@ -70,19 +70,37 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "API is working"})
 	})
 
-	routes := router.Group("/auth")
-	routes.GET("/login", func(c *gin.Context) {
-		auth.Login(c, oauthCfg, frontendURL)
-	})
-	routes.GET("/callback", func(c *gin.Context) {
-		auth.Callback(c, oauthCfg, db, frontendURL)
-	})
-	routes.GET("/whoami", auth.AuthOptional(db), func(c *gin.Context) {
-		auth.WhoAmI(c, db)
-	})
-	routes.POST("/logout", auth.AuthRequired(db), func(c *gin.Context) {
-		auth.Logout(c, db)
-	})
+	public := router.Group("/")
+	public.Use(auth.AuthOptional(db))
+	{
+		public.GET("/login", func(c *gin.Context) {
+			auth.Login(c, oauthCfg, frontendURL)
+		})
+
+		public.GET("/callback", func(c *gin.Context) {
+			auth.Callback(c, oauthCfg, db, frontendURL)
+		})
+
+		public.GET("/whoami", func(c *gin.Context) {
+			auth.WhoAmI(c, db)
+		})
+	}
+
+	private := router.Group("/")
+	private.Use(auth.AuthRequired(db))
+	{
+		private.POST("/logout", func(c *gin.Context) {
+			auth.Logout(c, db)
+		})
+
+		private.GET("/items", func(c *gin.Context) {
+			inventory.GetItems(c, db)
+		})
+
+		private.GET("items/:id", func(c *gin.Context) {
+			inventory.GetItem(c, db)
+		})
+	}
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal(err)

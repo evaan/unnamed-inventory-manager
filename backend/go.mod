@@ -1,4 +1,4 @@
-module github.com/evaan/unnamed-inventory-manager
+module gitlab.com/evaandev/unnamed-inventory-manager
 
 go 1.27.1
 

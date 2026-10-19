@@ -3,7 +3,6 @@ package auth
 import (
 	"net/http"
 
-	"github.com/evaan/unnamed-inventory-manager/Login-Server/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -15,9 +14,9 @@ func WhoAmI(c *gin.Context, db *gorm.DB) {
 		return
 	}
 
-	user := u.(*util.User)
+	user := u.(*User)
 
-	perms := make([]util.UserPermission, 0)
+	perms := make([]UserPermission, 0)
 	if err := db.Where("user_id = ?", user.ID).Find(&perms).Error; err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
