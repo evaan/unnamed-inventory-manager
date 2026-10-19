@@ -22,13 +22,7 @@ type UserSession struct {
 	User         User      `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 	UserID       uuid.UUID `gorm:"type:uuid;not null;index"`
 	SessionToken string    `gorm:"not null;uniqueIndex" json:"-"`
-	Expires      time.Time `gorm:"not null;index"`
-}
-
-type OAuthState struct {
-	StateHash    string    `gorm:"primaryKey;size:64" json:"-"`
-	CodeVerifier string    `gorm:"not null" json:"-"`
-	Expires      time.Time `gorm:"not null;index"`
+	Expires      time.Time `gorm:"not null"`
 }
 
 type UserPermission struct {
