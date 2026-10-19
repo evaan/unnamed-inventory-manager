@@ -26,3 +26,20 @@ backend_build:
   script:
     - cd backend
     - go build ./...
+
+backend_format:
+  stage: test
+  image: golang:alpine
+  script:
+    - cd backend
+    - |
+      unformatted=$(gofmt -l .)
+      echo "$unformatted"
+      test -z "$unformatted"
+
+backend_vet:
+  stage: test
+  image: golang:alpine
+  script:
+    - cd backend
+    - go vet ./...

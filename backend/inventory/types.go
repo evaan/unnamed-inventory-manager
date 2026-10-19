@@ -22,7 +22,7 @@ type Changelog struct {
 	ID          int             `gorm:"primaryKey;autoIncrement"`
 	UserID      uuid.UUID       `gorm:"type:uuid;not null"`
 	ItemID      uuid.UUID       `gorm:"type:uuid;not null"`
-	Item        Item            `gorm:foreignKey:ItemID;references:ID;constraint:OnDelete:RESTRICT"`
+	Item        Item            `gorm:"foreignKey:ItemID;references:ID;constraint:OnDelete:RESTRICT"`
 	Quantity    int16           `gorm:"type:int;not null"` // change to quantity
 	Action      ChangelogAction `gorm:"type:varchar(20);not null"`
 	ChangeTime  time.Time       `gorm:"not null"`
