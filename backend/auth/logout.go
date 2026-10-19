@@ -8,15 +8,15 @@ import (
 )
 
 func Logout(c *gin.Context, db *gorm.DB) {
-	token, err := c.Cookie("session_token")
+	token, err := c.Cookie("session")
 	if token == "" || err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	if err := db.Where("session_token = ?", token).Delete(&UserSession{}).Error; err != nil {
+	if err := db.WithContext(c.Request.Context()).Where("session_token = ?", HashToken(token)).Delete(&UserSession{}).Error; err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	c.SetCookie("session_token", "", -1, "/", "", false, true)
+	SetCookie(c, "session", "", -1)
 	c.Status(http.StatusOK)
 }

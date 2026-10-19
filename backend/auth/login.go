@@ -2,17 +2,23 @@ package auth
 
 import (
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
+	"gorm.io/gorm"
 )
 
-func Login(c *gin.Context, oauthCfg *oauth2.Config, frontendURL string) {
-	// OAuth state protects the login callback against CSRF.
+func Login(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB) {
 	state := GenerateToken()
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("oauth_state", state, 600, "/", "", strings.HasPrefix(oauthCfg.RedirectURL, "https://"), true)
-	authURL := oauthCfg.AuthCodeURL(state)
+	verifier := oauth2.GenerateVerifier()
+	if err := db.WithContext(c.Request.Context()).Create(&OAuthState{
+		StateHash: HashToken(state), CodeVerifier: verifier, Expires: time.Now().Add(10 * time.Minute),
+	}).Error; err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	SetCookie(c, "oauth_state", state, 600)
+	authURL := oauthCfg.AuthCodeURL(state, oauth2.S256ChallengeOption(verifier))
 	c.Redirect(http.StatusFound, authURL)
 }

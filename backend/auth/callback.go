@@ -1,9 +1,11 @@
 package auth
 
 import (
+	"context"
 	"crypto/subtle"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"golang.org/x/oauth2"
 	"google.golang.org/api/idtoken"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL string) {
@@ -22,17 +25,28 @@ func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL 
 		return
 	}
 
-	secure := strings.HasPrefix(oauthCfg.RedirectURL, "https://")
-	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("oauth_state", "", -1, "/", "", secure, true)
+	SetCookie(c, "oauth_state", "", -1)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	defer cancel()
+	db = db.WithContext(ctx)
+	var pending OAuthState
+	result := db.Clauses(clause.Returning{}).
+		Where("state_hash = ? AND expires > ?", HashToken(state), time.Now()).Delete(&pending)
+	if result.Error != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if result.RowsAffected != 1 {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
 	code := c.Query("code")
 	if code == "" {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 
-	ctx := c.Request.Context()
-	token, err := oauthCfg.Exchange(ctx, code)
+	token, err := oauthCfg.Exchange(ctx, code, oauth2.VerifierOption(pending.CodeVerifier))
 	if err != nil {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
@@ -61,36 +75,52 @@ func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL 
 
 	sessionToken := GenerateToken()
 	var user User
-	err = db.Where("email = ?", email).First(&user).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		user = User{ID: uuid.New(), Name: name, Email: email}
-		if err := db.Create(&user).Error; err != nil {
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
+	status := http.StatusInternalServerError
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := lockPermissions(tx); err != nil {
+			return err
 		}
-		var count int64
-		if err := db.Model(&User{}).Count(&count).Error; err != nil {
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("google_id = ?", payload.Subject).First(&user).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			user = User{ID: uuid.New(), Name: name, Email: email, GoogleID: payload.Subject, Disabled: false}
+			if err := tx.Create(&user).Error; err != nil {
+				if errors.Is(err, gorm.ErrDuplicatedKey) {
+					status = http.StatusConflict
+				}
+				return err
+			}
+		} else if err != nil {
+			return err
 		}
-		if count == 1 {
-			if err := db.Create(&UserPermission{UserID: user.ID, Permission: "Administrator"}).Error; err != nil {
-				c.AbortWithStatus(http.StatusInternalServerError)
-				return
+		if user.Disabled {
+			status = http.StatusForbidden
+			return errors.New("user is disabled")
+		}
+
+		adminID := strings.TrimSpace(os.Getenv("ADMIN_GOOGLE_ID"))
+		adminEmail := strings.TrimSpace(os.Getenv("ADMIN_EMAIL"))
+		bootstrap := adminID != "" && payload.Subject == adminID || adminID == "" && adminEmail != "" && email == adminEmail
+		if bootstrap {
+			var count int64
+			if err := tx.Model(&UserPermission{}).Where("permission = ?", PermissionAdministrator).Count(&count).Error; err != nil {
+				return err
+			}
+			if count == 0 {
+				if err := tx.Create(&UserPermission{UserID: user.ID, Permission: PermissionAdministrator}).Error; err != nil {
+					return err
+				}
 			}
 		}
-	} else if err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
+
+		return tx.Create(&UserSession{
+			UserID: user.ID, SessionToken: HashToken(sessionToken), Expires: time.Now().Add(8 * time.Hour),
+		}).Error
+	})
+	if err != nil {
+		c.AbortWithStatus(status)
 		return
 	}
 
-	if err := db.Create(&UserSession{
-		UserID: user.ID, SessionToken: sessionToken, Expires: time.Now().Add(8 * time.Hour),
-	}).Error; err != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	c.SetCookie("session_token", sessionToken, 8*60*60, "/", "", secure, true)
+	SetCookie(c, "session", sessionToken, 8*60*60)
 	c.Redirect(http.StatusSeeOther, frontendURL)
 }
