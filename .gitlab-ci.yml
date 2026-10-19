@@ -1,0 +1,28 @@
+stages:
+  - build
+  - test
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+
+frontend_build:
+  stage: build
+  image: node:alpine
+  script:
+    - cd frontend
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist/
+
+backend_build:
+  stage: build
+  image: golang:alpine
+  script:
+    - cd backend
+    - go build ./...
