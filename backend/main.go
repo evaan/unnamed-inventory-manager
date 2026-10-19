@@ -2,20 +2,29 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
 	"gitlab.com/evaandev/unnamed-inventory-manager/database"
+	_ "gitlab.com/evaandev/unnamed-inventory-manager/docs"
 	"gitlab.com/evaandev/unnamed-inventory-manager/inventory"
 	"gitlab.com/evaandev/unnamed-inventory-manager/middleware"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
+// @title			Unnamed Inventory Manager API
+// @version		1.0
+// @description	API backend for managing the Unnamed Inventory Manager, a tool for handling inventory
+// @host			localhost:8080
+// @BasePath		/
 func main() {
 	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
 		log.Fatalf("Error loading .env: %s", err)
@@ -74,6 +83,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// TOOD if gin mode is debug
+	router.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/swagger/index.html")
+	})
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	public := router.Group("/")
 	public.Use(middleware.AuthOptional(db))

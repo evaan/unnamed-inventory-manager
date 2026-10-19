@@ -15,6 +15,20 @@ import (
 	"gorm.io/gorm"
 )
 
+// @Summary		Finish logging in with Google
+// @Description	Checks the oauth_state cookie, starts a session and sends you back to the frontend
+// @Tags			Auth
+// @Param			state	query	string	true	"OAuth state from Google"
+// @Param			code	query	string	true	"Authorization code from Google"
+// @Success		303		"Redirect to the frontend"
+// @Header			303		{string}	Location	"Frontend URL"
+// @Header			303		{string}	Set-Cookie	"Session cookie, valid for 8 hours"
+// @Failure		400		"Missing code or invalid OAuth state"
+// @Failure		401		"Invalid Google login or unverified email"
+// @Failure		403		"User is disabled"
+// @Failure		409		"User details already in use"
+// @Failure		500		"Error logging in"
+// @Router			/callback [get]
 func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL string) {
 	state := c.Query("state")
 	expectedState, err := c.Cookie("oauth_state")

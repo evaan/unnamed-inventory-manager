@@ -43,3 +43,14 @@ backend_vet:
   script:
     - cd backend
     - go vet ./...
+
+backend_swagger:
+  stage: test
+  image: golang:alpine
+  before_script:
+    - apk add --no-cache git
+    - go install github.com/swaggo/swag/cmd/swag@latest
+  script:
+    - cd backend
+    - $(go env GOPATH)/bin/swag init -g main.go -o docs
+    - git diff --exit-code -- docs/

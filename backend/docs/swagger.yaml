@@ -1,0 +1,265 @@
+basePath: /
+definitions:
+  auth.PatchUserRequest:
+    properties:
+      disabled:
+        type: boolean
+    required:
+    - disabled
+    type: object
+  auth.PutPermissionsRequest:
+    properties:
+      permissions:
+        items:
+          type: string
+        type: array
+    required:
+    - permissions
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API backend for managing the Unnamed Inventory Manager, a tool for
+    handling inventory
+  title: Unnamed Inventory Manager API
+  version: "1.0"
+paths:
+  /callback:
+    get:
+      description: Checks the oauth_state cookie, starts a session and sends you back
+        to the frontend
+      parameters:
+      - description: OAuth state from Google
+        in: query
+        name: state
+        required: true
+        type: string
+      - description: Authorization code from Google
+        in: query
+        name: code
+        required: true
+        type: string
+      responses:
+        "303":
+          description: Redirect to the frontend
+          headers:
+            Location:
+              description: Frontend URL
+              type: string
+            Set-Cookie:
+              description: Session cookie, valid for 8 hours
+              type: string
+        "400":
+          description: Missing code or invalid OAuth state
+        "401":
+          description: Invalid Google login or unverified email
+        "403":
+          description: User is disabled
+        "409":
+          description: User details already in use
+        "500":
+          description: Error logging in
+      summary: Finish logging in with Google
+      tags:
+      - Auth
+  /login:
+    get:
+      description: Saves the login state in a cookie and sends you to Google
+      responses:
+        "302":
+          description: Redirect to Google
+          headers:
+            Location:
+              description: Google login URL
+              type: string
+            Set-Cookie:
+              description: OAuth state cookie, valid for 10 minutes
+              type: string
+        "500":
+          description: Error checking session
+      summary: Log in with Google
+      tags:
+      - Auth
+  /logout:
+    post:
+      description: Deletes your session and clears the session cookie. Must be logged
+        in
+      parameters:
+      - description: Frontend origin, required if Referer is not set
+        in: header
+        name: Origin
+        type: string
+      responses:
+        "200":
+          description: Logged out
+          headers:
+            Set-Cookie:
+              description: Clears the session cookie
+              type: string
+        "400":
+          description: Missing session cookie
+        "401":
+          description: Not logged in
+        "403":
+          description: Invalid or missing frontend Origin or Referer
+        "500":
+          description: Error logging out
+      summary: Log out
+      tags:
+      - Auth
+  /permissions:
+    get:
+      description: Uses the session cookie to get your permissions. Must be logged
+        in
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Current user's permissions
+          schema:
+            items:
+              type: string
+            type: array
+        "401":
+          description: Not logged in
+        "500":
+          description: Error getting permissions
+      summary: Get your permissions
+      tags:
+      - Auth
+  /permissions/{id}:
+    get:
+      description: Get permissions by user ID. Admin only, using the session cookie
+      parameters:
+      - description: User ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User's permissions
+          schema:
+            items:
+              type: string
+            type: array
+        "400":
+          description: Invalid user ID
+        "401":
+          description: Not logged in
+        "403":
+          description: Not an administrator
+        "404":
+          description: User not found
+        "500":
+          description: Error getting permissions
+      summary: Get a user's permissions
+      tags:
+      - Auth
+    put:
+      consumes:
+      - application/json
+      description: Replace the user's permissions, or send an empty list to clear
+        them. Admin only, using the session cookie
+      parameters:
+      - description: User ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User permissions
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.PutPermissionsRequest'
+      - description: Frontend origin, required if Referer is not set
+        in: header
+        name: Origin
+        type: string
+      responses:
+        "204":
+          description: Permissions updated
+        "400":
+          description: Invalid user ID or request body
+        "401":
+          description: Not logged in
+        "403":
+          description: Not an administrator or invalid frontend Origin or Referer
+        "404":
+          description: User not found
+        "500":
+          description: Error updating permissions
+      summary: Replace a user's permissions
+      tags:
+      - Auth
+  /users/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Disable or enable a user. Admin only, using the session cookie
+      parameters:
+      - description: User ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Whether the user is disabled
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.PatchUserRequest'
+      - description: Frontend origin, required if Referer is not set
+        in: header
+        name: Origin
+        type: string
+      responses:
+        "204":
+          description: User updated
+        "400":
+          description: Invalid user ID or request body
+        "401":
+          description: Not logged in
+        "403":
+          description: Not an administrator or invalid frontend Origin or Referer
+        "404":
+          description: User not found
+        "500":
+          description: Error updating user
+      summary: Update a user
+      tags:
+      - Auth
+  /whoami:
+    get:
+      description: 'Returns your name, email and permissions, or just loggedIn: false
+        if you''re not logged in'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login status and user details
+          schema:
+            properties:
+              email:
+                type: string
+              loggedIn:
+                type: boolean
+              name:
+                type: string
+              permissions:
+                items:
+                  type: string
+                type: array
+            type: object
+        "500":
+          description: Error getting current user
+      summary: Get the current user
+      tags:
+      - Auth
+swagger: "2.0"
