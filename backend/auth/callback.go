@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"crypto/subtle"
 	"errors"
 	"net/http"
@@ -14,7 +13,6 @@ import (
 	"golang.org/x/oauth2"
 	"google.golang.org/api/idtoken"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL string) {
@@ -26,27 +24,15 @@ func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL 
 	}
 
 	SetCookie(c, "oauth_state", "", -1)
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
-	defer cancel()
+	ctx := c.Request.Context()
 	db = db.WithContext(ctx)
-	var pending OAuthState
-	result := db.Clauses(clause.Returning{}).
-		Where("state_hash = ? AND expires > ?", HashToken(state), time.Now()).Delete(&pending)
-	if result.Error != nil {
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	if result.RowsAffected != 1 {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
 	code := c.Query("code")
 	if code == "" {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 
-	token, err := oauthCfg.Exchange(ctx, code, oauth2.VerifierOption(pending.CodeVerifier))
+	token, err := oauthCfg.Exchange(ctx, code)
 	if err != nil {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
@@ -80,7 +66,7 @@ func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL 
 		if err := lockPermissions(tx); err != nil {
 			return err
 		}
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("google_id = ?", payload.Subject).First(&user).Error
+		err := tx.Where("google_id = ?", payload.Subject).First(&user).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			user = User{ID: uuid.New(), Name: name, Email: email, GoogleID: payload.Subject, Disabled: false}
 			if err := tx.Create(&user).Error; err != nil {
@@ -97,10 +83,7 @@ func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL 
 			return errors.New("user is disabled")
 		}
 
-		adminID := strings.TrimSpace(os.Getenv("ADMIN_GOOGLE_ID"))
-		adminEmail := strings.TrimSpace(os.Getenv("ADMIN_EMAIL"))
-		bootstrap := adminID != "" && payload.Subject == adminID || adminID == "" && adminEmail != "" && email == adminEmail
-		if bootstrap {
+		if email == os.Getenv("ADMIN_EMAIL") {
 			var count int64
 			if err := tx.Model(&UserPermission{}).Where("permission = ?", PermissionAdministrator).Count(&count).Error; err != nil {
 				return err

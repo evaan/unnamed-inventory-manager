@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
-	"time"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -38,44 +36,22 @@ func main() {
 	if oauthCfg.ClientID == "" || oauthCfg.ClientSecret == "" || oauthCfg.RedirectURL == "" {
 		log.Fatal("GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URL must be set")
 	}
-	redirect, err := url.Parse(oauthCfg.RedirectURL)
-	if err != nil || redirect.Host == "" || (redirect.Scheme != "http" && redirect.Scheme != "https") || redirect.RawQuery != "" || redirect.Fragment != "" {
-		log.Fatal("GOOGLE_REDIRECT_URL must be an absolute HTTP or HTTPS URL without a query or fragment")
-	}
-
 	db, err := database.Connect()
 	if err != nil {
 		log.Fatalf("Error connecting to database: %s", err)
 	}
-	if err := db.AutoMigrate(&auth.User{}, &auth.UserPermission{}, &auth.UserSession{}, &auth.OAuthState{}, &inventory.Item{}, &inventory.Changelog{}); err != nil {
+	if err := db.AutoMigrate(&auth.User{}, &auth.UserPermission{}, &auth.UserSession{}, &inventory.Item{}, &inventory.Changelog{}); err != nil {
 		log.Fatalf("Error migrating database: %s", err)
-	}
-	go func() {
-		ticker := time.NewTicker(time.Hour)
-		defer ticker.Stop()
-		for {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			if err := auth.DeleteExpired(db.WithContext(ctx)); err != nil {
-				log.Printf("Error deleting expired authentication records: %s", err)
-			}
-			cancel()
-			<-ticker.C
-		}
-	}()
-
-	if os.Getenv("GIN_MODE") == "" {
-		gin.SetMode(gin.ReleaseMode)
 	}
 	router := gin.New()
 	router.Use(gin.LoggerWithConfig(gin.LoggerConfig{SkipQueryString: true}), gin.Recovery())
 	router.Use(func(c *gin.Context) {
-		c.Set("secureCookies", redirect.Scheme == "https")
-		c.Header("Cache-Control", "no-store")
+		c.Set("secureCookies", strings.HasPrefix(oauthCfg.RedirectURL, "https://"))
 		c.Next()
 	})
 	frontendOrigin := frontend.Scheme + "://" + frontend.Host
 	router.Use(middleware.CORS(frontendOrigin))
-	router.Use(middleware.CSRF(frontendOrigin, redirect.Scheme+"://"+redirect.Host))
+	router.Use(middleware.CSRF(frontendOrigin))
 
 	err = router.SetTrustedProxies([]string{
 		"127.0.0.1",
@@ -103,7 +79,7 @@ func main() {
 	public.Use(middleware.AuthOptional(db))
 	{
 		public.GET("/login", func(c *gin.Context) {
-			auth.Login(c, oauthCfg, db)
+			auth.Login(c, oauthCfg)
 		})
 
 		public.GET("/callback", func(c *gin.Context) {
@@ -147,12 +123,7 @@ func main() {
 		})
 	}
 
-	server := &http.Server{
-		Addr: ":8080", Handler: router,
-		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second,
-		WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,
-	}
-	if err := server.ListenAndServe(); err != nil {
+	if err := router.Run(":8080"); err != nil {
 		log.Fatal(err)
 	}
 }

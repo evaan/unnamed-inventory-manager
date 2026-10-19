@@ -3,7 +3,6 @@ package auth
 import (
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -60,12 +59,4 @@ func SetCookie(c *gin.Context, name, value string, maxAge int) {
 
 func lockPermissions(db *gorm.DB) error {
 	return db.Exec("SELECT pg_advisory_xact_lock(?)", int64(740461835)).Error
-}
-
-func DeleteExpired(db *gorm.DB) error {
-	now := time.Now()
-	return errors.Join(
-		db.Where("expires <= ?", now).Delete(&UserSession{}).Error,
-		db.Where("expires <= ?", now).Delete(&OAuthState{}).Error,
-	)
 }
