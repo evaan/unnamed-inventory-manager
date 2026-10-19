@@ -8,23 +8,16 @@ import (
 )
 
 func WhoAmI(c *gin.Context, db *gorm.DB) {
-	u, exists := c.Get("user")
-	if !exists || u == nil {
+	user, err := GetUser(c)
+	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"loggedIn": false})
 		return
 	}
 
-	user := u.(*User)
-
-	perms := make([]UserPermission, 0)
-	if err := db.Where("user_id = ?", user.ID).Find(&perms).Error; err != nil {
+	permissions, err := GetUserPermissions(db.WithContext(c.Request.Context()), user.ID)
+	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
-	}
-
-	permissions := make([]string, 0, len(perms))
-	for _, p := range perms {
-		permissions = append(permissions, p.Permission)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
