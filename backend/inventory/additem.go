@@ -1,40 +1,61 @@
 package inventory
 
 import (
-	"errors"
 	"net/http"
+	"time"
+	"uuid"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
+// TODO: add real uuid for User
+// TODO: make creation of log and item one db transaction
 func AddItem(c *gin.Context, db *gorm.DB) {
-
-	id := c.Param("id")
-
-	if id == "" {
+	var req CreateItemReq
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "No item selected",
+			"error": err.Error(),
 		})
 		return
 	}
 
-	var item Item
-	if err := db.First(&item, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": "Item not found",
-			})
-			return
-		}
+	newItem := Item{
+		ID:               uuid.New(),
+		ItemName:         req.ItemName,
+		Quantity:         *req.Quantity,
+		Manufacturer:     req.Manufacturer,
+		ManufacturerPart: req.ManufacturerPart,
+		DistributorPart:  req.DistributorPart,
+		DistributorURL:   req.DistributorURL,
+		DataSheetURL:     req.DataSheetURL,
+		Description:      req.Description}
 
+	if err := db.Create(&newItem).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to retrieve item",
+			"error": "Failed to create item",
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"item": item,
+	// Add to changelog
+	// TODO: add real uuid for User
+	log := Changelog{
+		UserID:      uuid.New(),
+		ItemID:      newItem.ID,
+		Quantity:    *req.Quantity,
+		Action:      ItemCreated,
+		ChangeTime:  time.Now(),
+		Description: req.LogDescription}
+
+	if err := db.Create(&log).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to create changelog",
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"item": newItem,
 	})
 }

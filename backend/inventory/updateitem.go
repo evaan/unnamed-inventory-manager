@@ -55,6 +55,13 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 	}
 
 	newItem := createNewItem(req)
+	if len(newItem) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "No item fields provided for update",
+		})
+		return
+	}
+
 	if req.Quantity == nil {
 		req.Quantity = &item.Quantity
 	}
@@ -102,38 +109,4 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 	c.JSON(http.StatusOK, gin.H{
 		"item": item,
 	})
-}
-
-func createNewItem(req UpdateItemReq) map[string]interface{} {
-	newItem := map[string]interface{}{}
-
-	if req.ItemName != nil {
-		newItem["item_name"] = *req.ItemName
-	}
-	if req.Quantity != nil {
-		newItem["quantity"] = *req.Quantity
-	}
-	if req.Manufacturer != nil {
-		newItem["manufacturer"] = *req.Manufacturer
-	}
-	if req.ManufacturerPart != nil {
-		newItem["manufacturer_part"] = *req.ManufacturerPart
-	}
-	if req.DistributorPart != nil {
-		newItem["distributor_part"] = *req.DistributorPart
-	}
-	if req.DistributorURL != nil {
-		newItem["distributor_url"] = *req.DistributorURL
-	}
-	if req.ItemDescription != nil {
-		newItem["description"] = *req.ItemDescription
-	}
-	if req.DataSheetURL != nil {
-		newItem["data_sheet_url"] = *req.DataSheetURL
-	}
-	if req.LogDescription != nil {
-		newItem["data_sheet_url"] = *req.LogDescription
-	}
-
-	return newItem
 }

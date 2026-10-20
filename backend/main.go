@@ -125,7 +125,7 @@ func main() {
 			inventory.GetItemByID(c, db)
 		})
 
-		router.POST("/:id", func(c *gin.Context) {
+		router.POST("/", func(c *gin.Context) {
 			inventory.AddItem(c, db)
 		})
 
