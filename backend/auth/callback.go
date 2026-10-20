@@ -25,7 +25,6 @@ import (
 // @Header			303		{string}	Set-Cookie	"Session cookie, valid for 8 hours"
 // @Failure		400		"Missing code or invalid OAuth state"
 // @Failure		401		"Invalid Google login or unverified email"
-// @Failure		403		"User is disabled"
 // @Failure		409		"User details already in use"
 // @Failure		500		"Error logging in"
 // @Router			/callback [get]
@@ -92,12 +91,7 @@ func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL 
 		} else if err != nil {
 			return err
 		}
-		if user.Disabled {
-			status = http.StatusForbidden
-			return errors.New("user is disabled")
-		}
-
-		if email == os.Getenv("ADMIN_EMAIL") {
+		if !user.Disabled && email == os.Getenv("ADMIN_EMAIL") {
 			var count int64
 			if err := tx.Model(&UserPermission{}).Where("permission = ?", PermissionAdministrator).Count(&count).Error; err != nil {
 				return err

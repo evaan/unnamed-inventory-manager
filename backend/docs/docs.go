@@ -58,9 +58,6 @@ const docTemplate = `{
                     "401": {
                         "description": "Invalid Google login or unverified email"
                     },
-                    "403": {
-                        "description": "User is disabled"
-                    },
                     "409": {
                         "description": "User details already in use"
                     },
@@ -99,7 +96,7 @@ const docTemplate = `{
         },
         "/logout": {
             "post": {
-                "description": "Deletes your session and clears the session cookie. Must be logged in",
+                "description": "Deletes your session and clears the session cookie. Available to logged-in users, including disabled users",
                 "tags": [
                     "Auth"
                 ],
@@ -328,7 +325,7 @@ const docTemplate = `{
         },
         "/whoami": {
             "get": {
-                "description": "Returns your name, email and permissions, or just loggedIn: false if you're not logged in",
+                "description": "Returns login status and disabled status. Enabled users also receive their name, email and permissions",
                 "produces": [
                     "application/json"
                 ],
@@ -342,6 +339,9 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "properties": {
+                                "disabled": {
+                                    "type": "boolean"
+                                },
                                 "email": {
                                     "type": "string"
                                 },

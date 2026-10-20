@@ -1,28 +1,7 @@
-import { useState } from 'react';
-import { LoginPage } from './pages/LoginPage';
-import { MainPage } from './pages/MainPage';
+import AppRoutes from './routes/AppRoutes';
 
 function App() {
-  const [token, setToken] = useState<string | null>(() => {
-    // Check localStorage so refreshing the page doesn't log you out
-    return localStorage.getItem('google_token');
-  });
-
-  const handleLogin = (accessToken: string) => {
-    localStorage.setItem('google_token', accessToken);
-    setToken(accessToken);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('google_token');
-    setToken(null);
-  };
-
-  if (!token) {
-    return <LoginPage onLoginSuccess={handleLogin} />;
-  }
-
-  return <MainPage token={token} onLogout={handleLogout} />;
+  return <AppRoutes />;
 }
 
 export default App;
