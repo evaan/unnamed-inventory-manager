@@ -9,7 +9,7 @@ import (
 )
 
 // TODO: make this support stuff in request body like name
-func GetItem(c *gin.Context, db *gorm.DB) {
+func GetItemByID(c *gin.Context, db *gorm.DB) {
 	id := c.Param("id")
 
 	if id == "" {

@@ -122,7 +122,19 @@ func main() {
 		})
 
 		private.GET("items/:id", func(c *gin.Context) {
-			inventory.GetItem(c, db)
+			inventory.GetItemByID(c, db)
+		})
+
+		router.POST("/:id", func(c *gin.Context) {
+			inventory.AddItem(c, db)
+		})
+
+		router.PUT("/:id", func(c *gin.Context) {
+			inventory.UpdateItem(c, db)
+		})
+
+		router.DELETE("/:id", func(c *gin.Context) {
+			inventory.DeleteItem(c, db)
 		})
 	}
 
