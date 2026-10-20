@@ -13,5 +13,5 @@ jobs:
   backend:
     uses: ./.github/workflows/backend.yml
 
-  # frontend:
-  #   uses: ./.github/workflows/frontend.yml
+  frontend:
+    uses: ./.github/workflows/frontend.yml
