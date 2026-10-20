@@ -11,10 +11,54 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@v5
         with:
           go-version: stable
           cache: false
-      - run: go build ./...
+      - name: Build
+        run: go build ./...
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test
+        run: echo "not implemented!"
+
+  stylecheck:
+    needs: build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - name: Check formatting
+        run: |
+          gofmt -l . | tee /tmp/fmt
+          test ! -s /tmp/fmt
+      - name: Vet
+        run: go vet ./...
+
+  swagger:
+    needs: build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - name: Install Swagger
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+      - name: Check Swagger docs
+        run: |
+          $(go env GOPATH)/bin/swag init -g main.go -o docs
+          git diff --exit-code -- docs/
