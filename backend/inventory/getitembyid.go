@@ -3,6 +3,7 @@ package inventory
 import (
 	"errors"
 	"net/http"
+	"uuid"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -15,6 +16,12 @@ func GetItemByID(c *gin.Context, db *gorm.DB) {
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "No item selected",
+		})
+		return
+	}
+	if _, err := uuid.Parse(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid item ID",
 		})
 		return
 	}

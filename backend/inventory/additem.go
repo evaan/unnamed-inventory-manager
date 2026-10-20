@@ -8,8 +8,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// TODO: make this support stuff in request body like name
 func AddItem(c *gin.Context, db *gorm.DB) {
+
 	id := c.Param("id")
 
 	if id == "" {
