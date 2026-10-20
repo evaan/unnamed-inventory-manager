@@ -1,12 +1,4 @@
-import { useGoogleOAuth } from '../features/auth/useGoogleOAuth';
-
-interface LoginPageProps {
-  onLoginSuccess: (token: string) => void;
-}
-
-export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
-  const { loginWithToken } = useGoogleOAuth(onLoginSuccess);
-
+export const LoginPage = () => {
   return (
     <div className="min-h-screen w-full bg-slate-800 flex items-center justify-center p-4">
       
@@ -18,7 +10,7 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
         </div>
 
         <button
-          onClick={() => loginWithToken()}
+          onClick={() => window.location.assign('/api/login')}
           className="flex w-full items-center justify-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-700 border border-slate-300 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md active:scale-[0.98]"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -41,7 +33,6 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
           </svg>
           Continue with Google
         </button>
-
       </div>
     </div>
   );

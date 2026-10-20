@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -84,11 +85,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// TOOD if gin mode is debug
-	router.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusFound, "/swagger/index.html")
-	})
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	if gin.Mode() == gin.DebugMode {
+		router.GET("/", func(c *gin.Context) {
+			prefix := c.GetHeader("X-Forwarded-Prefix")
+			c.Redirect(http.StatusFound, path.Join("/", prefix, "swagger/index.html"))
+		})
+		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
 
 	public := router.Group("/")
 	public.Use(middleware.AuthOptional(db))
@@ -106,13 +109,17 @@ func main() {
 		})
 	}
 
+	session := router.Group("/")
+	session.Use(middleware.SessionRequired(db))
+	{
+		session.POST("/logout", func(c *gin.Context) {
+			auth.Logout(c, db)
+		})
+	}
+
 	private := router.Group("/")
 	private.Use(middleware.AuthRequired(db))
 	{
-		private.POST("/logout", func(c *gin.Context) {
-			auth.Logout(c, db)
-		})
-
 		private.GET("/permissions", func(c *gin.Context) {
 			auth.GetPermissions(c, db)
 		})

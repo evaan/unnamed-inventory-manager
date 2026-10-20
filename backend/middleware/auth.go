@@ -52,21 +52,21 @@ func AuthOptional(db *gorm.DB) gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
-		if user.Disabled {
-			if err := db.Where("user_id = ?", user.ID).Delete(&auth.UserSession{}).Error; err != nil {
-				c.AbortWithStatus(http.StatusInternalServerError)
-				return
-			}
-			auth.SetCookie(c, "session", "", -1)
-			c.Next()
-			return
-		}
 		c.Set("user", &user)
 		c.Next()
 	}
 }
 
 func AuthRequired(db *gorm.DB) gin.HandlerFunc {
+	return requireSession(db, false)
+}
+
+// SessionRequired allows disabled users to access session-only operations such as logout.
+func SessionRequired(db *gorm.DB) gin.HandlerFunc {
+	return requireSession(db, true)
+}
+
+func requireSession(db *gorm.DB, allowDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		db := db.WithContext(c.Request.Context())
 		token, err := c.Cookie("session")
@@ -107,13 +107,8 @@ func AuthRequired(db *gorm.DB) gin.HandlerFunc {
 			c.AbortWithStatus(status)
 			return
 		}
-		if user.Disabled {
-			if err := db.Where("user_id = ?", user.ID).Delete(&auth.UserSession{}).Error; err != nil {
-				c.AbortWithStatus(http.StatusInternalServerError)
-				return
-			}
-			auth.SetCookie(c, "session", "", -1)
-			c.AbortWithStatus(http.StatusUnauthorized)
+		if user.Disabled && !allowDisabled {
+			c.AbortWithStatus(http.StatusForbidden)
 			return
 		}
 		c.Set("user", &user)

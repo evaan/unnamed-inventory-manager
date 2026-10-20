@@ -8,7 +8,7 @@ import (
 )
 
 // @Summary		Log out
-// @Description	Deletes your session and clears the session cookie. Must be logged in
+// @Description	Deletes your session and clears the session cookie. Available to logged-in users, including disabled users
 // @Tags			Auth
 // @Param			Origin	header	string	false	"Frontend origin, required if Referer is not set"
 // @Success		200		"Logged out"
