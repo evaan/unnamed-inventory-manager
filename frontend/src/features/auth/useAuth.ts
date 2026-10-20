@@ -1,32 +1,31 @@
-import { useCallback, useEffect, useState } from "react";
-import { type AuthState, whoAmI, login, logout } from "./auth";
-
-const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS === "true";
-
-const DEV_USER: AuthState = {
-  loggedIn: true,
-  name: "Dev User",
-  email: "dev@example.com",
-  permissions: ["Administrator"],
-};
+import { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { authQueryKey, logout, whoAmI } from './auth';
 
 export function useAuth() {
-  const [auth, setAuth] = useState<AuthState | null>(DEV_BYPASS ? DEV_USER : null);
-
-  const refresh = useCallback(async () => {
-    if (DEV_BYPASS) return;
-    setAuth(await whoAmI());
-  }, []);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const query = useQuery({
+    queryKey: authQueryKey,
+    queryFn: ({ signal }) => whoAmI(signal),
+    retry: false,
+  });
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (query.data?.loggedIn && query.data.disabled && pathname !== '/disabled') {
+      void navigate('/disabled', { replace: true });
+    }
+  }, [query.data, pathname, navigate]);
 
-  const signOut = async () => {
-    if (DEV_BYPASS) return;
-    await logout();
-    await refresh();
-  };
+  return query;
+}
 
-  return { auth, loading: auth === null, login, logout: signOut, refresh };
+export function useLogout() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: logout,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: authQueryKey }),
+  });
 }
