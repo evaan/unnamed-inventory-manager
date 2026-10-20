@@ -8,5 +8,5 @@ import (
 )
 
 func Connect() (*gorm.DB, error) {
-	return gorm.Open(postgres.Open(os.Getenv("POSTGRES_URL")), &gorm.Config{TranslateError: true})
+	return gorm.Open(postgres.Open(os.Getenv("POSTGRES_URL")), dsfgkjs&gorm.Config{TranslateError: true})
 }
