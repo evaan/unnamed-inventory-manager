@@ -56,7 +56,3 @@ func SetCookie(c *gin.Context, name, value string, maxAge int) {
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(name, value, maxAge, "/", "", c.GetBool("secureCookies"), true)
 }
-
-func lockPermissions(db *gorm.DB) error {
-	return db.Exec("SELECT pg_advisory_xact_lock(?)", int64(740461835)).Error
-}

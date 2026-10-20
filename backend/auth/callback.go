@@ -76,9 +76,6 @@ func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL 
 	var user User
 	status := http.StatusInternalServerError
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := lockPermissions(tx); err != nil {
-			return err
-		}
 		err := tx.Where("google_id = ?", payload.Subject).First(&user).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			user = User{ID: uuid.New(), Name: name, Email: email, GoogleID: payload.Subject, Disabled: false}
