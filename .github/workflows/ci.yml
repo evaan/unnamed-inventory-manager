@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    uses: ./.github/workflows/backend.yml
+
+  # frontend:
+  #   uses: ./.github/workflows/frontend.yml
