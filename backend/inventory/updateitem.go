@@ -48,7 +48,7 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 
 	var req UpdateItemReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{
+		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 		return
