@@ -15,7 +15,7 @@ import (
 // @title			Unnamed Inventory Manager API
 // @version		1.0
 // @description	API backend for managing the Unnamed Inventory Manager, a tool for handling inventory
-// @host			localhost:8080
+// @host			localhost:8081
 // @BasePath		/
 func main() {
 	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
