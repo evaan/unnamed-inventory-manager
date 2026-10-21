@@ -27,11 +27,6 @@ func createNewItem(req UpdateItemReq) map[string]interface{} {
 	if req.DataSheetURL != nil {
 		newItem["data_sheet_url"] = *req.DataSheetURL
 	}
-	if req.LogDescription != nil {
-		newItem["log_description"] = *req.LogDescription
-	} else {
-		newItem["log_description"] = ""
-	}
 
 	return newItem
 }

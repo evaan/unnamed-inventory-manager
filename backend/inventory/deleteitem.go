@@ -10,9 +10,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// TODO: create req object with log description
-// TODO: add real uuid for User
+// @Summary		Delete an item
+// @Description	Deletes an item and logs the deletion
+// @Tags			Item
+// @Accept			json
+// @Param			id		path	string				true	"Item ID"	Format(uuid)
+// @Success		204		"Item deleted"
+// @Failure		400		"Invalid item ID"
+// @Failure		404		"Item not found"
+// @Failure		500		"Error retrieving or deleting item or creating log"
+// @Router			/items/{id} [delete]
 func DeleteItem(c *gin.Context, db *gorm.DB) {
+	// TODO: create req object with log description
+	// TODO: add real uuid for User
 	id := c.Param("id")
 
 	if id == "" {
@@ -31,7 +41,7 @@ func DeleteItem(c *gin.Context, db *gorm.DB) {
 	}
 
 	var item Item
-	if err := db.First(&item, id).Error; err != nil {
+	if err := db.First(&item, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Item not found",
@@ -46,7 +56,7 @@ func DeleteItem(c *gin.Context, db *gorm.DB) {
 	}
 	quantity := item.Quantity * (-1)
 
-	if err := db.Delete(&item, id).Error; err != nil {
+	if err := db.Delete(&item, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to delete item",
 		})

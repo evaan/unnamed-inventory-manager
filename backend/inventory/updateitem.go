@@ -10,11 +10,22 @@ import (
 	"gorm.io/gorm"
 )
 
-// TODO: add real uuid for User in changelog
-// TODO: create one transaction between both update of item and log creation
+// @Summary		Update item
+// @Description	Update item information
+// @Tags			Item
+// @Accept			json
+// @Param			id		path	string				true	"Item ID"	Format(uuid)
+// @Param			body	body	UpdateItemReq	true	"Item information to be updated (name, quantity, manufacturer, etc.). Only changed files are necessary"
+// @Success		200		"Item updated (returns object)"
+// @Failure		400		"Invalid item id, invalid request body, empty request body"
+// @Failure		404		"Item not found, failure to update item or create log, fail to retrieve modified item"
+// @Failure		500		"Failed to retrieve item, "
+// @Router			/items/{id} [put]
 func UpdateItem(c *gin.Context, db *gorm.DB) {
-	//Update item by id
+	// TODO: add real uuid for User in changelog
+	// TODO: create one transaction between both update of item and log creation
 
+	//Update item by id
 	id := c.Param("id")
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -31,7 +42,7 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 	}
 
 	var item Item
-	if err := db.First(&item, id).Error; err != nil {
+	if err := db.First(&item, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Item not found",
@@ -82,6 +93,9 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 		action = ItemTaken
 	}
 
+	if req.LogDescription == nil {
+		req.LogDescription = new(string)
+	}
 	// TODO: add real uuid for User
 	log := Changelog{
 		UserID:      uuid.New(),
@@ -99,9 +113,9 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 	}
 
 	// Return item
-	if err := db.First(&item, id).Error; err != nil {
+	if err := db.First(&item, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to retrieve item",
+			"error": "Failed to retrieve updated item",
 		})
 		return
 	}

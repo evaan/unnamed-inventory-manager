@@ -6,7 +6,7 @@
         "contact": {},
         "version": "1.0"
     },
-    "host": "localhost:8080",
+    "host": "localhost:8081",
     "basePath": "/",
     "paths": {
         "/callback": {
@@ -57,6 +57,171 @@
                     },
                     "500": {
                         "description": "Error logging in"
+                    }
+                }
+            }
+        },
+        "/items": {
+            "get": {
+                "description": "Gets information for all items",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item"
+                ],
+                "summary": "Get all Items",
+                "responses": {
+                    "200": {
+                        "description": "Item information retrieved"
+                    },
+                    "500": {
+                        "description": "Error retrieving items"
+                    }
+                }
+            },
+            "post": {
+                "description": "Adds item to inventory",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item"
+                ],
+                "summary": "Add item",
+                "parameters": [
+                    {
+                        "description": "Item information (name, quantity, manufacturer, etc.)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/inventory.CreateItemReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Item created"
+                    },
+                    "400": {
+                        "description": "Invalid request body"
+                    },
+                    "500": {
+                        "description": "Error creating item or log"
+                    }
+                }
+            }
+        },
+        "/items/{id}": {
+            "get": {
+                "description": "Gets full information for one item",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item"
+                ],
+                "summary": "Get item",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Item ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Item retrieved"
+                    },
+                    "400": {
+                        "description": "Invalid item ID"
+                    },
+                    "404": {
+                        "description": "Item not found"
+                    },
+                    "500": {
+                        "description": "Error retrieving item"
+                    }
+                }
+            },
+            "put": {
+                "description": "Update item information",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item"
+                ],
+                "summary": "Update item",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Item ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Item information to be updated (name, quantity, manufacturer, etc.). Only changed files are necessary",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/inventory.UpdateItemReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Item updated (returns object)"
+                    },
+                    "400": {
+                        "description": "Invalid item id, invalid request body, empty request body"
+                    },
+                    "404": {
+                        "description": "Item not found, failure to update item or create log, fail to retrieve modified item"
+                    },
+                    "500": {
+                        "description": "Failed to retrieve item, "
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes an item and logs the deletion",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item"
+                ],
+                "summary": "Delete an item",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Item ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Item deleted"
+                    },
+                    "400": {
+                        "description": "Invalid item ID"
+                    },
+                    "404": {
+                        "description": "Item not found"
+                    },
+                    "500": {
+                        "description": "Error retrieving or deleting item or creating log"
                     }
                 }
             }
@@ -124,6 +289,26 @@
                     },
                     "500": {
                         "description": "Error logging out"
+                    }
+                }
+            }
+        },
+        "/logs": {
+            "get": {
+                "description": "Gets all logs saved from changes to the inventory",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item"
+                ],
+                "summary": "Get changelog",
+                "responses": {
+                    "200": {
+                        "description": "Log information retrieved"
+                    },
+                    "500": {
+                        "description": "Error retrieving logs"
                     }
                 }
             }
@@ -384,6 +569,76 @@
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "inventory.CreateItemReq": {
+            "type": "object",
+            "required": [
+                "itemName",
+                "manufacturer",
+                "manufacturerPart",
+                "quantity"
+            ],
+            "properties": {
+                "dataSheetURL": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "distributorPart": {
+                    "type": "string"
+                },
+                "distributorURL": {
+                    "type": "string"
+                },
+                "itemName": {
+                    "type": "string"
+                },
+                "logDescription": {
+                    "type": "string"
+                },
+                "manufacturer": {
+                    "type": "string"
+                },
+                "manufacturerPart": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "inventory.UpdateItemReq": {
+            "type": "object",
+            "properties": {
+                "dataSheetURL": {
+                    "type": "string"
+                },
+                "distributorPart": {
+                    "type": "string"
+                },
+                "distributorURL": {
+                    "type": "string"
+                },
+                "itemDescription": {
+                    "type": "string"
+                },
+                "itemName": {
+                    "type": "string"
+                },
+                "logDescription": {
+                    "type": "string"
+                },
+                "manufacturer": {
+                    "type": "string"
+                },
+                "manufacturerPart": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
                 }
             }
         }

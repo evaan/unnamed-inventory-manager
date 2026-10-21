@@ -24,7 +24,7 @@ import (
 // @title			Unnamed Inventory Manager API
 // @version		1.0
 // @description	API backend for managing the Unnamed Inventory Manager, a tool for handling inventory
-// @host			localhost:8080
+// @host			localhost:8081
 // @BasePath		/
 func main() {
 	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
@@ -61,8 +61,12 @@ func main() {
 	})
 	frontendOrigin := frontend.Scheme + "://" + frontend.Host
 	router.Use(middleware.CORS(frontendOrigin))
-	router.Use(middleware.CSRF(frontendOrigin))
 
+	if gin.Mode() == gin.DebugMode {
+		router.Use(middleware.CSRF(frontendOrigin, "http://localhost:8081"))
+	} else {
+		router.Use(middleware.CSRF(frontendOrigin))
+	}
 	err = router.SetTrustedProxies([]string{
 		"127.0.0.1",
 		"173.245.48.0/20",
@@ -107,6 +111,31 @@ func main() {
 		public.GET("/whoami", func(c *gin.Context) {
 			auth.WhoAmI(c, db)
 		})
+
+		public.GET("/items", func(c *gin.Context) {
+			inventory.GetItems(c, db)
+		})
+
+		public.GET("items/:id", func(c *gin.Context) {
+			inventory.GetItemByID(c, db)
+		})
+
+		public.POST("/items", func(c *gin.Context) {
+			inventory.AddItem(c, db)
+		})
+
+		public.PUT("/items/:id", func(c *gin.Context) {
+			inventory.UpdateItem(c, db)
+		})
+
+		public.DELETE("/items/:id", func(c *gin.Context) {
+			inventory.DeleteItem(c, db)
+		})
+
+		public.GET("/logs", func(c *gin.Context) {
+			inventory.GetLogs(c, db)
+		})
+
 	}
 
 	session := router.Group("/")
@@ -122,26 +151,6 @@ func main() {
 	{
 		private.GET("/permissions", func(c *gin.Context) {
 			auth.GetPermissions(c, db)
-		})
-
-		private.GET("/items", func(c *gin.Context) {
-			inventory.GetItems(c, db)
-		})
-
-		private.GET("items/:id", func(c *gin.Context) {
-			inventory.GetItemByID(c, db)
-		})
-
-		router.POST("/", func(c *gin.Context) {
-			inventory.AddItem(c, db)
-		})
-
-		router.PUT("/:id", func(c *gin.Context) {
-			inventory.UpdateItem(c, db)
-		})
-
-		router.DELETE("/:id", func(c *gin.Context) {
-			inventory.DeleteItem(c, db)
 		})
 	}
 

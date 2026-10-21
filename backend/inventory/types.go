@@ -3,6 +3,8 @@ package inventory
 import (
 	"time"
 	"uuid"
+
+	"gorm.io/gorm"
 )
 
 type Item struct {
@@ -15,6 +17,7 @@ type Item struct {
 	DistributorURL   string
 	DataSheetURL     string
 	Description      string
+	DeletedAt        gorm.DeletedAt
 }
 
 type Changelog struct {

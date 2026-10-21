@@ -16,7 +16,54 @@ definitions:
     required:
     - permissions
     type: object
-host: localhost:8080
+  inventory.CreateItemReq:
+    properties:
+      dataSheetURL:
+        type: string
+      description:
+        type: string
+      distributorPart:
+        type: string
+      distributorURL:
+        type: string
+      itemName:
+        type: string
+      logDescription:
+        type: string
+      manufacturer:
+        type: string
+      manufacturerPart:
+        type: string
+      quantity:
+        type: integer
+    required:
+    - itemName
+    - manufacturer
+    - manufacturerPart
+    - quantity
+    type: object
+  inventory.UpdateItemReq:
+    properties:
+      dataSheetURL:
+        type: string
+      distributorPart:
+        type: string
+      distributorURL:
+        type: string
+      itemDescription:
+        type: string
+      itemName:
+        type: string
+      logDescription:
+        type: string
+      manufacturer:
+        type: string
+      manufacturerPart:
+        type: string
+      quantity:
+        type: integer
+    type: object
+host: localhost:8081
 info:
   contact: {}
   description: API backend for managing the Unnamed Inventory Manager, a tool for
@@ -60,6 +107,118 @@ paths:
       summary: Finish logging in with Google
       tags:
       - Auth
+  /items:
+    get:
+      consumes:
+      - application/json
+      description: Gets information for all items
+      responses:
+        "200":
+          description: Item information retrieved
+        "500":
+          description: Error retrieving items
+      summary: Get all Items
+      tags:
+      - Item
+    post:
+      consumes:
+      - application/json
+      description: Adds item to inventory
+      parameters:
+      - description: Item information (name, quantity, manufacturer, etc.)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/inventory.CreateItemReq'
+      responses:
+        "200":
+          description: Item created
+        "400":
+          description: Invalid request body
+        "500":
+          description: Error creating item or log
+      summary: Add item
+      tags:
+      - Item
+  /items/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes an item and logs the deletion
+      parameters:
+      - description: Item ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Item deleted
+        "400":
+          description: Invalid item ID
+        "404":
+          description: Item not found
+        "500":
+          description: Error retrieving or deleting item or creating log
+      summary: Delete an item
+      tags:
+      - Item
+    get:
+      consumes:
+      - application/json
+      description: Gets full information for one item
+      parameters:
+      - description: Item ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Item retrieved
+        "400":
+          description: Invalid item ID
+        "404":
+          description: Item not found
+        "500":
+          description: Error retrieving item
+      summary: Get item
+      tags:
+      - Item
+    put:
+      consumes:
+      - application/json
+      description: Update item information
+      parameters:
+      - description: Item ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Item information to be updated (name, quantity, manufacturer,
+          etc.). Only changed files are necessary
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/inventory.UpdateItemReq'
+      responses:
+        "200":
+          description: Item updated (returns object)
+        "400":
+          description: Invalid item id, invalid request body, empty request body
+        "404":
+          description: Item not found, failure to update item or create log, fail
+            to retrieve modified item
+        "500":
+          description: 'Failed to retrieve item, '
+      summary: Update item
+      tags:
+      - Item
   /login:
     get:
       description: Saves the login state in a cookie and sends you to Google
@@ -105,6 +264,19 @@ paths:
       summary: Log out
       tags:
       - Auth
+  /logs:
+    get:
+      consumes:
+      - application/json
+      description: Gets all logs saved from changes to the inventory
+      responses:
+        "200":
+          description: Log information retrieved
+        "500":
+          description: Error retrieving logs
+      summary: Get changelog
+      tags:
+      - Item
   /permissions:
     get:
       description: Uses the session cookie to get your permissions. Must be logged

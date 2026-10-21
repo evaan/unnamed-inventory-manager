@@ -9,8 +9,18 @@ import (
 	"gorm.io/gorm"
 )
 
-// TODO: make this support stuff in request body like name
+// @Summary		Get item
+// @Description	Gets full information for one item
+// @Tags			Item
+// @Accept			json
+// @Param			id		path	string				true	"Item ID"	Format(uuid)
+// @Success		200		"Item retrieved"
+// @Failure		400		"Invalid item ID"
+// @Failure		404		"Item not found"
+// @Failure		500		"Error retrieving item"
+// @Router			/items/{id} [get]
 func GetItemByID(c *gin.Context, db *gorm.DB) {
+	// TODO: make this support stuff in request body like name
 	id := c.Param("id")
 
 	if id == "" {
@@ -27,7 +37,7 @@ func GetItemByID(c *gin.Context, db *gorm.DB) {
 	}
 
 	var item Item
-	if err := db.First(&item, id).Error; err != nil {
+	if err := db.First(&item, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Item not found",

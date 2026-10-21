@@ -9,9 +9,18 @@ import (
 	"gorm.io/gorm"
 )
 
-// TODO: add real uuid for User
-// TODO: make creation of log and item one db transaction
+// @Summary		Add item
+// @Description	Adds item to inventory
+// @Tags			Item
+// @Accept			json
+// @Param			body	body	CreateItemReq	true	"Item information (name, quantity, manufacturer, etc.)"
+// @Success		201		"Item created"
+// @Failure		400		"Invalid request body"
+// @Failure		500		"Error creating item or log"
+// @Router			/items [post]
 func AddItem(c *gin.Context, db *gorm.DB) {
+	// TODO: add real uuid for User
+	// TODO: make creation of log and item one db transaction
 	var req CreateItemReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
