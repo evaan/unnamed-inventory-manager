@@ -155,7 +155,7 @@ func TestRemovingAdminBlocksAdminActions(t *testing.T) {
 	response = makeRequest(router, http.MethodPut, path, `{"permissions":["Administrator"]}`, token)
 	requireStatus(t, response, http.StatusForbidden)
 
-	response = makeRequest(router, http.MethodPatch, "/users/"+user.ID.String(), `{"disabled":true}`, token)
+	response = makeRequest(router, http.MethodPatch, "/user/"+user.ID.String(), `{"disabled":true}`, token)
 	requireStatus(t, response, http.StatusForbidden)
 
 	response = makeRequest(router, http.MethodGet, "/whoami", "", userToken)
@@ -173,7 +173,7 @@ func TestDisableAndEnableUser(t *testing.T) {
 	router, db := newAuthRouter(t)
 	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
 	user, token := newTestSession(t, db, "View")
-	path := "/users/" + user.ID.String()
+	path := "/user/" + user.ID.String()
 
 	response := makeRequest(router, http.MethodPatch, path, `{"disabled":true}`, adminToken)
 	requireStatus(t, response, http.StatusNoContent)
@@ -211,7 +211,7 @@ func TestRegularUserCannotDisableUser(t *testing.T) {
 	_, token := newTestSession(t, db)
 	user, userToken := newTestSession(t, db)
 
-	response := makeRequest(router, http.MethodPatch, "/users/"+user.ID.String(), `{"disabled":true}`, token)
+	response := makeRequest(router, http.MethodPatch, "/user/"+user.ID.String(), `{"disabled":true}`, token)
 	requireStatus(t, response, http.StatusForbidden)
 
 	response = makeRequest(router, http.MethodGet, "/permissions", "", userToken)
