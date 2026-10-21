@@ -111,7 +111,7 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 			auth.PutPermissions(c, db)
 		})
 
-		admin.PATCH("/users/:id", func(c *gin.Context) {
+		admin.PATCH("/user/:id", func(c *gin.Context) {
 			auth.PatchUser(c, db)
 		})
 	}
