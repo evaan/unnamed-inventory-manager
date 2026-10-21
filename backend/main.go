@@ -42,19 +42,7 @@ func main() {
 	}
 	router := gin.New()
 	router.Use(gin.LoggerWithConfig(gin.LoggerConfig{SkipQueryString: true}), gin.Recovery())
-  
-	router.Use(func(c *gin.Context) {
-		c.Set("secureCookies", strings.HasPrefix(oauthCfg.RedirectURL, "https://"))
-		c.Next()
-	})
-	frontendOrigin := frontend.Scheme + "://" + frontend.Host
-	router.Use(middleware.CORS(frontendOrigin))
 
-	if gin.Mode() == gin.DebugMode {
-		router.Use(middleware.CSRF(frontendOrigin, "http://localhost:8081"))
-	} else {
-		router.Use(middleware.CSRF(frontendOrigin))
-	}
 	err = router.SetTrustedProxies([]string{
 		"127.0.0.1",
 		"173.245.48.0/20",
@@ -77,87 +65,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if gin.Mode() == gin.DebugMode {
-		router.GET("/", func(c *gin.Context) {
-			prefix := c.GetHeader("X-Forwarded-Prefix")
-			c.Redirect(http.StatusFound, path.Join("/", prefix, "swagger/index.html"))
-		})
-		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	}
-
-	public := router.Group("/")
-	public.Use(middleware.AuthOptional(db))
-	{
-		public.GET("/login", func(c *gin.Context) {
-			auth.Login(c, oauthCfg)
-		})
-
-		public.GET("/callback", func(c *gin.Context) {
-			auth.Callback(c, oauthCfg, db, frontendURL)
-		})
-
-		public.GET("/whoami", func(c *gin.Context) {
-			auth.WhoAmI(c, db)
-		})
-
-		public.GET("/items", func(c *gin.Context) {
-			inventory.GetItems(c, db)
-		})
-
-		public.GET("items/:id", func(c *gin.Context) {
-			inventory.GetItemByID(c, db)
-		})
-
-		public.POST("/items", func(c *gin.Context) {
-			inventory.AddItem(c, db)
-		})
-
-		public.PUT("/items/:id", func(c *gin.Context) {
-			inventory.UpdateItem(c, db)
-		})
-
-		public.DELETE("/items/:id", func(c *gin.Context) {
-			inventory.DeleteItem(c, db)
-		})
-
-		public.GET("/logs", func(c *gin.Context) {
-			inventory.GetLogs(c, db)
-		})
-
-	}
-
-	session := router.Group("/")
-	session.Use(middleware.SessionRequired(db))
-	{
-		session.POST("/logout", func(c *gin.Context) {
-			auth.Logout(c, db)
-		})
-	}
-
-	private := router.Group("/")
-	private.Use(middleware.AuthRequired(db))
-	{
-		private.GET("/permissions", func(c *gin.Context) {
-			auth.GetPermissions(c, db)
-		})
-	}
-
-	admin := router.Group("/")
-	admin.Use(middleware.AuthRequired(db), middleware.AdminRequired(db))
-	{
-		admin.GET("/permissions/:id", func(c *gin.Context) {
-			auth.GetPermissionsFromId(c, db)
-		})
-
-		admin.PUT("/permissions/:id", func(c *gin.Context) {
-			auth.PutPermissions(c, db)
-		})
-
-		admin.PATCH("/users/:id", func(c *gin.Context) {
-			auth.PatchUser(c, db)
-		})
-  }
-  
 	if err := routes.Register(router, db, oauthCfg, frontendURL); err != nil {
 		log.Fatal(err)
 	}

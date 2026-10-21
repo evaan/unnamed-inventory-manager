@@ -30,8 +30,11 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 	})
 	frontendOrigin := frontend.Scheme + "://" + frontend.Host
 	router.Use(middleware.CORS(frontendOrigin))
-	router.Use(middleware.CSRF(frontendOrigin))
-
+	if gin.Mode() == gin.DebugMode {
+		router.Use(middleware.CSRF(frontendOrigin, "http://localhost:8081"))
+	} else {
+		router.Use(middleware.CSRF(frontendOrigin))
+	}
 	if gin.Mode() == gin.DebugMode {
 		router.GET("/", func(c *gin.Context) {
 			prefix := c.GetHeader("X-Forwarded-Prefix")
@@ -54,6 +57,31 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 		public.GET("/whoami", func(c *gin.Context) {
 			auth.WhoAmI(c, db)
 		})
+
+		public.GET("/items", func(c *gin.Context) {
+			inventory.GetItems(c, db)
+		})
+
+		public.GET("items/:id", func(c *gin.Context) {
+			inventory.GetItemByID(c, db)
+		})
+
+		public.POST("/items", func(c *gin.Context) {
+			inventory.AddItem(c, db)
+		})
+
+		public.PUT("/items/:id", func(c *gin.Context) {
+			inventory.UpdateItem(c, db)
+		})
+
+		public.DELETE("/items/:id", func(c *gin.Context) {
+			inventory.DeleteItem(c, db)
+		})
+
+		public.GET("/logs", func(c *gin.Context) {
+			inventory.GetLogs(c, db)
+		})
+
 	}
 
 	session := router.Group("/")
@@ -69,14 +97,6 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 	{
 		private.GET("/permissions", func(c *gin.Context) {
 			auth.GetPermissions(c, db)
-		})
-
-		private.GET("/items", func(c *gin.Context) {
-			inventory.GetItems(c, db)
-		})
-
-		private.GET("items/:id", func(c *gin.Context) {
-			inventory.GetItem(c, db)
 		})
 	}
 
