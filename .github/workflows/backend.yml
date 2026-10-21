@@ -21,9 +21,17 @@ jobs:
   test:
     needs: build
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
       - name: Test
-        run: echo "not implemented!"
+        run: go test ./... -v
 
   stylecheck:
     needs: build
