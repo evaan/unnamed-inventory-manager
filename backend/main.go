@@ -2,21 +2,12 @@ package main
 
 import (
 	"log"
-	"net/http"
-	"net/url"
 	"os"
-	"path"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
-	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
 	"gitlab.com/evaandev/unnamed-inventory-manager/database"
-	_ "gitlab.com/evaandev/unnamed-inventory-manager/docs"
-	"gitlab.com/evaandev/unnamed-inventory-manager/inventory"
-	"gitlab.com/evaandev/unnamed-inventory-manager/middleware"
+	"gitlab.com/evaandev/unnamed-inventory-manager/routes"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -32,10 +23,6 @@ func main() {
 	}
 
 	frontendURL := os.Getenv("FRONTEND_URL")
-	frontend, err := url.Parse(frontendURL)
-	if err != nil || frontend.Host == "" || (frontend.Scheme != "http" && frontend.Scheme != "https") {
-		log.Fatal("FRONTEND_URL must be an absolute HTTP or HTTPS URL")
-	}
 	oauthCfg := &oauth2.Config{
 		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
@@ -50,11 +37,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to database: %s", err)
 	}
-	if err := db.AutoMigrate(&auth.User{}, &auth.UserPermission{}, &auth.UserSession{}, &inventory.Item{}, &inventory.Changelog{}); err != nil {
+	if err := database.Migrate(db); err != nil {
 		log.Fatalf("Error migrating database: %s", err)
 	}
 	router := gin.New()
 	router.Use(gin.LoggerWithConfig(gin.LoggerConfig{SkipQueryString: true}), gin.Recovery())
+  
 	router.Use(func(c *gin.Context) {
 		c.Set("secureCookies", strings.HasPrefix(oauthCfg.RedirectURL, "https://"))
 		c.Next()
@@ -168,6 +156,10 @@ func main() {
 		admin.PATCH("/users/:id", func(c *gin.Context) {
 			auth.PatchUser(c, db)
 		})
+  }
+  
+	if err := routes.Register(router, db, oauthCfg, frontendURL); err != nil {
+		log.Fatal(err)
 	}
 
 	if err := router.Run(":8080"); err != nil {
