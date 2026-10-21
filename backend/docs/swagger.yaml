@@ -132,7 +132,7 @@ paths:
         schema:
           $ref: '#/definitions/inventory.CreateItemReq'
       responses:
-        "200":
+        "201":
           description: Item created
         "400":
           description: Invalid request body

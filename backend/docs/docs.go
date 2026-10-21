@@ -107,7 +107,7 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "201": {
                         "description": "Item created"
                     },
                     "400": {
