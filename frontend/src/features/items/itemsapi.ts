@@ -19,9 +19,6 @@ export type NewItem = Omit<Item, 'ID'>;
 // Sent with POST / PUT / DELETE so the API can record what happened.
 export type ItemAction = 'CREATE' | 'TAKEN' | 'ADDED' | 'DELETE';
 
-// TODO: confirm the base path / host once the API is up.
-const _BASE_URL = '/items';
-
 /* ---------- DUMMY STORE (remove when the API is live) ---------- */
 let db: Item[] = [
   {
