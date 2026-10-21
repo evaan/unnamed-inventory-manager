@@ -10,8 +10,7 @@ export const LoginPage = () => {
         </div>
 
         <button
-          onClick={() => window.location.assign('/api/login')}
-          className="flex w-full items-center justify-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-700 border border-slate-300 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md active:scale-[0.98]"
+          onClick={() => window.location.assign(`${import.meta.env.VITE_API_URL}/login`)}          className="flex w-full items-center justify-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-700 border border-slate-300 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md active:scale-[0.98]"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24">
             <path
