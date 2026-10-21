@@ -20,7 +20,7 @@ export type NewItem = Omit<Item, 'ID'>;
 export type ItemAction = 'CREATE' | 'TAKEN' | 'ADDED' | 'DELETE';
 
 // TODO: confirm the base path / host once the API is up.
-const BASE_URL = '/items';
+const _BASE_URL = '/items';
 
 /* ---------- DUMMY STORE (remove when the API is live) ---------- */
 let db: Item[] = [
