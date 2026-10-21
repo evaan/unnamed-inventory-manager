@@ -7,6 +7,7 @@ import (
 	"uuid"
 
 	"github.com/gin-gonic/gin"
+	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
 	"gorm.io/gorm"
 )
 
@@ -22,7 +23,12 @@ import (
 // @Failure		500		"Failed to retrieve item, "
 // @Router			/items/{id} [put]
 func UpdateItem(c *gin.Context, db *gorm.DB) {
-	// TODO: add real uuid for User in changelog
+	user, err := auth.GetUser(c)
+	if err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
 	// TODO: create one transaction between both update of item and log creation
 
 	//Update item by id
@@ -33,7 +39,7 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 		})
 		return
 	}
-	var itemid, err = uuid.Parse(id)
+	itemid, err := uuid.Parse(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid item ID",
@@ -96,9 +102,8 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 	if req.LogDescription == nil {
 		req.LogDescription = new(string)
 	}
-	// TODO: add real uuid for User
 	log := Changelog{
-		UserID:      uuid.New(),
+		UserID:      uuid.UUID(user.ID),
 		ItemID:      itemid,
 		Quantity:    deltaQ,
 		Action:      action,
