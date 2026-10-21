@@ -6,6 +6,7 @@ import (
 	"uuid"
 
 	"github.com/gin-gonic/gin"
+	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
 	"gorm.io/gorm"
 )
 
@@ -19,7 +20,11 @@ import (
 // @Failure		500		"Error creating item or log"
 // @Router			/items [post]
 func AddItem(c *gin.Context, db *gorm.DB) {
-	// TODO: add real uuid for User
+	user, err := auth.GetUser(c)
+	if err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
 	// TODO: make creation of log and item one db transaction
 	var req CreateItemReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -48,9 +53,8 @@ func AddItem(c *gin.Context, db *gorm.DB) {
 	}
 
 	// Add to changelog
-	// TODO: add real uuid for User
 	log := Changelog{
-		UserID:      uuid.New(),
+		UserID:      uuid.UUID(user.ID),
 		ItemID:      newItem.ID,
 		Quantity:    *req.Quantity,
 		Action:      ItemCreated,

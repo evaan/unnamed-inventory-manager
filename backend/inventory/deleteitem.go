@@ -7,6 +7,7 @@ import (
 	"uuid"
 
 	"github.com/gin-gonic/gin"
+	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
 	"gorm.io/gorm"
 )
 
@@ -22,7 +23,12 @@ import (
 // @Router			/items/{id} [delete]
 func DeleteItem(c *gin.Context, db *gorm.DB) {
 	// TODO: create req object with log description
-	// TODO: add real uuid for User
+	user, err := auth.GetUser(c)
+	if err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
 	id := c.Param("id")
 
 	if id == "" {
@@ -68,9 +74,8 @@ func DeleteItem(c *gin.Context, db *gorm.DB) {
 
 	// TODO: create req object with log description
 	logdescription := ""
-	// TODO: add real uuid for User
 	log := Changelog{
-		UserID:      uuid.New(),
+		UserID:      uuid.UUID(user.ID),
 		ItemID:      itemid,
 		Quantity:    quantity,
 		Action:      action,
