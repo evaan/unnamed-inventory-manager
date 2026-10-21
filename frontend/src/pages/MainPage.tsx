@@ -12,9 +12,9 @@ import {
 
 type Stock = 'In stock' | 'Low stock' | 'Out of stock';
 
-// Stock status is derived from Quantity, not stored.
+// Stock status is derived from quantity, not stored.
 const getStock = (item: Item): Stock =>
-  item.Quantity === 0 ? 'Out of stock' : item.Quantity <= 10 ? 'Low stock' : 'In stock'; // static threshold TODO: add dynamic for assign2
+  item.quantity === 0 ? 'Out of stock' : item.quantity <= 10 ? 'Low stock' : 'In stock'; // static threshold TODO: add dynamic for assign2
 
 const STOCK_STYLES: Record<Stock, string> = {
   'In stock': 'bg-emerald-500/15 text-emerald-300',
@@ -23,45 +23,45 @@ const STOCK_STYLES: Record<Stock, string> = {
 };
 
 // Unsaved new items live under this ID until the API assigns a real one.
-const DRAFT_ID = -1;
+const DRAFT_ID = '__draft__';
 
 const BLANK_ITEM: Item = {
-  ID: DRAFT_ID,
-  ItemName: '',
-  Quantity: 0,
-  Manufacturer: '',
-  ManufacturerPart: '',
-  DistributorPart: '',
-  DistributorURL: '',
-  DataSheetURL: '',
-  Description: '',
+  id: DRAFT_ID,
+  itemName: '',
+  quantity: 0,
+  manufacturer: '',
+  manufacturerPart: '',
+  distributorPart: '',
+  distributorURL: '',
+  dataSheetURL: '',
+  description: '',
 };
 
-// While editing, Quantity is kept as a string so the input can be empty mid-typing.
-type Draft = Record<keyof NewItem, string>;
+// While editing, quantity is kept as a string so the input can be empty mid-typing.
+type Draft = Record<Exclude<keyof NewItem, 'logDescription'>, string>;
 
 const toDraft = (i: Item): Draft => ({
-  ItemName: i.ItemName,
-  Quantity: String(i.Quantity),
-  Manufacturer: i.Manufacturer,
-  ManufacturerPart: i.ManufacturerPart,
-  DistributorPart: i.DistributorPart,
-  DistributorURL: i.DistributorURL,
-  DataSheetURL: i.DataSheetURL,
-  Description: i.Description,
+  itemName: i.itemName,
+  quantity: String(i.quantity),
+  manufacturer: i.manufacturer,
+  manufacturerPart: i.manufacturerPart,
+  distributorPart: i.distributorPart ?? '',
+  distributorURL: i.distributorURL ?? '',
+  dataSheetURL: i.dataSheetURL ?? '',
+  description: i.description ?? '',
 });
 
 const toCount = (s: string) => Math.max(0, Math.floor(Number(s) || 0));
 
 const fromDraft = (d: Draft): NewItem => ({
-  ItemName: d.ItemName.trim(),
-  Quantity: toCount(d.Quantity),
-  Manufacturer: d.Manufacturer.trim(),
-  ManufacturerPart: d.ManufacturerPart.trim(),
-  DistributorPart: d.DistributorPart.trim(),
-  DistributorURL: d.DistributorURL.trim(),
-  DataSheetURL: d.DataSheetURL.trim(),
-  Description: d.Description.trim(),
+  itemName: d.itemName.trim(),
+  quantity: toCount(d.quantity),
+  manufacturer: d.manufacturer.trim(),
+  manufacturerPart: d.manufacturerPart.trim(),
+  distributorPart: d.distributorPart.trim(),
+  distributorURL: d.distributorURL.trim(),
+  dataSheetURL: d.dataSheetURL.trim(),
+  description: d.description.trim(),
 });
 
 const INPUT =
@@ -121,8 +121,9 @@ const NewItemForm = ({
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!d.ItemName.trim()) {
-      setError('Add a name before saving.');
+    // The API rejects empty values for these three.
+    if (!d.itemName.trim() || !d.manufacturer.trim() || !d.manufacturerPart.trim()) {
+      setError('Name, manufacturer and manufacturer part # are required.');
       return;
     }
     onSave(fromDraft(d));
@@ -135,9 +136,9 @@ const NewItemForm = ({
           <Field label="Name" className="col-span-2">
             <input
               autoFocus
-              value={d.ItemName}
+              value={d.itemName}
               onChange={(e) => {
-                set('ItemName', e.target.value);
+                set('itemName', e.target.value);
                 setError('');
               }}
               placeholder="e.g. 4.7 kΩ resistor, 0805"
@@ -145,25 +146,25 @@ const NewItemForm = ({
             />
           </Field>
           <Field label="Quantity" className="col-span-2">
-            <input value={d.Quantity} onChange={(e) => set('Quantity', e.target.value)} className={INPUT} />
+            <input value={d.quantity} onChange={(e) => set('quantity', e.target.value)} className={INPUT} />
           </Field>
           <Field label="Manufacturer" className="col-span-2">
-            <input value={d.Manufacturer} onChange={(e) => set('Manufacturer', e.target.value)} className={INPUT} />
+            <input value={d.manufacturer} onChange={(e) => set('manufacturer', e.target.value)} className={INPUT} />
           </Field>
           <Field label="Manufacturer Part #" className="col-span-2">
-            <input value={d.ManufacturerPart} onChange={(e) => set('ManufacturerPart', e.target.value)} className={INPUT} />
+            <input value={d.manufacturerPart} onChange={(e) => set('manufacturerPart', e.target.value)} className={INPUT} />
           </Field>
           <Field label="Distributor Part #" className="col-span-2">
-            <input value={d.DistributorPart} onChange={(e) => set('DistributorPart', e.target.value)} className={INPUT} />
+            <input value={d.distributorPart} onChange={(e) => set('distributorPart', e.target.value)} className={INPUT} />
           </Field>
           <Field label="Distributor URL" className="col-span-2">
-            <input value={d.DistributorURL} onChange={(e) => set('DistributorURL', e.target.value)} className={INPUT} />
+            <input value={d.distributorURL} onChange={(e) => set('distributorURL', e.target.value)} className={INPUT} />
           </Field>
           <Field label="Data Sheet URL" className="col-span-2">
-            <input value={d.DataSheetURL} onChange={(e) => set('DataSheetURL', e.target.value)} className={INPUT} />
+            <input value={d.dataSheetURL} onChange={(e) => set('dataSheetURL', e.target.value)} className={INPUT} />
           </Field>
           <Field label="Description" className="col-span-2">
-            <input value={d.Description} onChange={(e) => set('Description', e.target.value)} className={INPUT} />
+            <input value={d.description} onChange={(e) => set('description', e.target.value)} className={INPUT} />
           </Field>
         </section>
 
@@ -199,8 +200,8 @@ interface SpotlightProps {
   onClose: () => void;
   onCancel: () => void;
   onSave: (item: NewItem) => void;
-  onAdjust: (id: number, delta: number) => void;
-  onDelete: (id: number) => void;
+  onAdjust: (id: string, delta: number) => void;
+  onDelete: (id: string) => void;
 }
 
 const SpotlightPanel = ({
@@ -223,8 +224,8 @@ const SpotlightPanel = ({
             <h2 className="text-base font-semibold leading-snug">New item</h2>
           ) : (
             <>
-              <h2 className="text-base font-semibold leading-snug mt-0.5">{item.ItemName}</h2>
-              <p className="text-xs text-slate-400 font-mono mt-1">{item.ManufacturerPart}</p>
+              <h2 className="text-base font-semibold leading-snug mt-0.5">{item.itemName}</h2>
+              <p className="text-xs text-slate-400 font-mono mt-1">{item.manufacturerPart}</p>
             </>
           )}
         </div>
@@ -232,7 +233,7 @@ const SpotlightPanel = ({
           {!isDraft && (
             <button
               onClick={() => {
-                if (window.confirm(`Delete "${item.ItemName}"? This can't be undone.`)) onDelete(item.ID);
+                if (window.confirm(`Delete "${item.itemName}"? This can't be undone.`)) onDelete(item.id);
               }}
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors"
               title="Delete item"
@@ -256,7 +257,7 @@ const SpotlightPanel = ({
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
           <section>
             <div className="flex items-baseline justify-between">
-              <p className="text-2xl font-semibold tabular-nums">{item.Quantity.toLocaleString()}</p>
+              <p className="text-2xl font-semibold tabular-nums">{item.quantity.toLocaleString()}</p>
               <span className={`text-xs px-2 py-0.5 rounded-full ${STOCK_STYLES[stock]}`}>{stock}</span>
             </div>
 
@@ -264,8 +265,8 @@ const SpotlightPanel = ({
               {[-10, -1, 1, 10].map((delta) => (
                 <button
                   key={delta}
-                  onClick={() => onAdjust(item.ID, delta)}
-                  disabled={delta < 0 && item.Quantity < Math.abs(delta)}
+                  onClick={() => onAdjust(item.id, delta)}
+                  disabled={delta < 0 && item.quantity < Math.abs(delta)}
                   className="py-1.5 rounded-lg text-sm bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 transition-colors tabular-nums"
                 >
                   {delta > 0 ? `+${delta}` : delta}
@@ -275,25 +276,25 @@ const SpotlightPanel = ({
           </section>
 
           <section className="space-y-4">
-            {item.Manufacturer && (
+            {item.manufacturer && (
               <Detail label="Manufacturer">
                 <span className="flex items-center gap-2">
                   <Truck className="w-4 h-4 text-slate-500 shrink-0" />
-                  {item.Manufacturer}
+                  {item.manufacturer}
                 </span>
               </Detail>
             )}
-            {item.DistributorPart && (
+            {item.distributorPart && (
               <Detail label="Distributor part #">
-                <span className="font-mono text-xs">{item.DistributorPart}</span>
+                <span className="font-mono text-xs">{item.distributorPart}</span>
               </Detail>
             )}
-            {item.Description && <Detail label="Description">{item.Description}</Detail>}
-            {(item.DistributorURL || item.DataSheetURL) && (
+            {item.description && <Detail label="Description">{item.description}</Detail>}
+            {(item.distributorURL || item.dataSheetURL) && (
               <Detail label="Links">
                 <div className="flex flex-col gap-1">
-                  {item.DistributorURL && <ExternalLinkText url={item.DistributorURL} text="Distributor page" />}
-                  {item.DataSheetURL && <ExternalLinkText url={item.DataSheetURL} text="Data sheet" />}
+                  {item.distributorURL && <ExternalLinkText url={item.distributorURL} text="Distributor page" />}
+                  {item.dataSheetURL && <ExternalLinkText url={item.dataSheetURL} text="Data sheet" />}
                 </div>
               </Detail>
             )}
@@ -319,7 +320,7 @@ export const MainPage = () => {
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : 'Something went wrong');
 
-  // GET /
+  // GET /items
   useEffect(() => {
     let cancelled = false;
     getItems()
@@ -338,12 +339,12 @@ export const MainPage = () => {
   }, []);
 
   /* Spotlight + new-item draft */
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Item | null>(null); // unsaved new item, never sent to the API until saved
   const spotlightItem =
-    selectedId === DRAFT_ID ? draft : items.find((i) => i.ID === selectedId) ?? null;
+    selectedId === DRAFT_ID ? draft : items.find((i) => i.id === selectedId) ?? null;
 
-  const selectItem = (id: number | null) => {
+  const selectItem = (id: string | null) => {
     if (id !== DRAFT_ID) setDraft(null);
     setSelectedId(id);
   };
@@ -370,7 +371,7 @@ export const MainPage = () => {
     setSelectedId(DRAFT_ID);
   };
 
-  // POST /  (Action: CREATE)
+  // POST /items
   const saveNew = async (item: NewItem) => {
     setSaving(true);
     setError('');
@@ -378,7 +379,7 @@ export const MainPage = () => {
       const created = await createItem(item);
       setItems((prev) => [created, ...prev]);
       setDraft(null);
-      setSelectedId(created.ID);
+      setSelectedId(created.id);
     } catch (e) {
       fail(e);
     } finally {
@@ -386,23 +387,23 @@ export const MainPage = () => {
     }
   };
 
-  // PUT /:id  (Action: ADDED or TAKEN)
-  const adjustQuantity = async (id: number, delta: number) => {
+  // PUT /items/{id}  (new quantity + logDescription, computed in adjustItem)
+  const adjustQuantity = async (id: string, delta: number) => {
     setError('');
     try {
       const updated = await adjustItem(id, delta > 0 ? 'ADDED' : 'TAKEN', Math.abs(delta));
-      setItems((prev) => prev.map((i) => (i.ID === id ? updated : i)));
+      setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
     } catch (e) {
       fail(e);
     }
   };
 
-  // DELETE /:id  (Action: DELETE)
-  const removeItem = async (id: number) => {
+  // DELETE /items/{id}
+  const removeItem = async (id: string) => {
     setError('');
     try {
       await deleteItem(id);
-      setItems((prev) => prev.filter((i) => i.ID !== id));
+      setItems((prev) => prev.filter((i) => i.id !== id));
       setSelectedId(null);
     } catch (e) {
       fail(e);
@@ -414,7 +415,7 @@ export const MainPage = () => {
     if (!q) return items;
     return items.filter(
       (item) =>
-        item.ItemName.toLowerCase().includes(q) || item.ManufacturerPart.toLowerCase().includes(q)
+        item.itemName.toLowerCase().includes(q) || item.manufacturerPart.toLowerCase().includes(q)
     );
   }, [items, query]);
 
@@ -483,14 +484,14 @@ export const MainPage = () => {
             <ul className="divide-y divide-slate-800/80">
               {rows.map((item) => {
                 const stock = getStock(item);
-                const isSelected = item.ID === selectedId;
-                const isDraft = item.ID === DRAFT_ID;
-                const subtitle = [item.ManufacturerPart, item.DistributorPart].filter(Boolean).join(' · ');
+                const isSelected = item.id === selectedId;
+                const isDraft = item.id === DRAFT_ID;
+                const subtitle = [item.manufacturerPart, item.distributorPart].filter(Boolean).join(' · ');
                 return (
-                  <li key={item.ID}>
+                  <li key={item.id}>
                     <button
                       onClick={() => {
-                        if (!isDraft) selectItem(isSelected ? null : item.ID);
+                        if (!isDraft) selectItem(isSelected ? null : item.id);
                       }}
                       aria-pressed={isSelected}
                       className={`w-full px-6 py-3.5 flex items-center gap-4 text-left border-l-2 transition-colors ${
@@ -500,8 +501,8 @@ export const MainPage = () => {
                       }`}
                     >
                       <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-medium truncate ${item.ItemName ? '' : 'italic text-slate-500'}`}>
-                          {item.ItemName || 'Untitled item'}
+                        <p className={`text-sm font-medium truncate ${item.itemName ? '' : 'italic text-slate-500'}`}>
+                          {item.itemName || 'Untitled item'}
                         </p>
                         <p className="text-xs text-slate-500 truncate">{subtitle || 'No details yet'}</p>
                       </div>
@@ -530,9 +531,9 @@ export const MainPage = () => {
         <div className="w-96 h-full">
           {spotlightItem && (
             <SpotlightPanel
-              key={spotlightItem.ID}
+              key={spotlightItem.id}
               item={spotlightItem}
-              isDraft={spotlightItem.ID === DRAFT_ID}
+              isDraft={spotlightItem.id === DRAFT_ID}
               saving={saving}
               onClose={() => selectItem(null)}
               onCancel={cancelDraft}

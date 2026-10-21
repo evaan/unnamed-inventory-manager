@@ -1,8 +1,16 @@
-// Dummy item API. Same signatures the real client will have, backed by an in-memory array.
-// To go live: delete the DUMMY STORE section and swap each function body for the fetch shown in its comment.
+// Item API client for the Unnamed Inventory Manager API (Go/gin backend, localhost:8081).
+// Auth is a session cookie set by /login -> /callback, so every request sends credentials.
+//
+// Note the backend's naming split:
+//   - request bodies use camelCase (CreateItemReq / UpdateItemReq have json tags)
+//   - responses use PascalCase, because the Go `Item` struct has no json tags
+// The app uses camelCase everywhere, so responses are converted in `fromServer` below.
 
-export interface Item {
-  ID: number;
+const BASE_URL = 'http://localhost:8081';
+
+// Shape of an item as the server returns it.
+interface ServerItem {
+  ID: string; // uuid
   ItemName: string;
   Quantity: number;
   Manufacturer: string;
@@ -13,120 +21,127 @@ export interface Item {
   Description: string;
 }
 
-// What the client sends on create; the server assigns the ID.
-export type NewItem = Omit<Item, 'ID'>;
+// Item as the app uses it. Optional text fields come back as '' when unset.
+export interface Item {
+  id: string;
+  itemName: string;
+  quantity: number;
+  manufacturer: string;
+  manufacturerPart: string;
+  distributorPart: string;
+  distributorURL: string;
+  dataSheetURL: string;
+  description: string;
+}
 
-// Sent with POST / PUT / DELETE so the API can record what happened.
-export type ItemAction = 'CREATE' | 'TAKEN' | 'ADDED' | 'DELETE';
+const fromServer = (s: ServerItem): Item => ({
+  id: s.ID,
+  itemName: s.ItemName,
+  quantity: s.Quantity,
+  manufacturer: s.Manufacturer,
+  manufacturerPart: s.ManufacturerPart,
+  distributorPart: s.DistributorPart,
+  distributorURL: s.DistributorURL,
+  dataSheetURL: s.DataSheetURL,
+  description: s.Description,
+});
 
-/* ---------- DUMMY STORE (remove when the API is live) ---------- */
-let db: Item[] = [
-  {
-    ID: 1,
-    ItemName: '4.7 kΩ resistor, 0805',
-    Quantity: 250,
-    Manufacturer: 'Yageo',
-    ManufacturerPart: 'RC0805FR-074K7L',
-    DistributorPart: '311-4.70KCRCT-ND',
-    DistributorURL: 'https://www.digikey.com/',
-    DataSheetURL: 'https://www.yageo.com/',
-    Description: 'Thick film resistor, 1%, 0.125 W',
-  },
-  {
-    ID: 2,
-    ItemName: 'ATmega328P-AU',
-    Quantity: 8,
-    Manufacturer: 'Microchip',
-    ManufacturerPart: 'ATMEGA328P-AU',
-    DistributorPart: 'ATMEGA328P-AU-ND',
-    DistributorURL: '',
-    DataSheetURL: '',
-    Description: '8-bit AVR microcontroller, TQFP-32',
-  },
-  {
-    ID: 3,
-    ItemName: '100 nF capacitor, 0603',
-    Quantity: 0,
-    Manufacturer: 'Murata',
-    ManufacturerPart: 'GRM188R71H104KA93D',
-    DistributorPart: '490-1532-1-ND',
-    DistributorURL: '',
-    DataSheetURL: '',
-    Description: '',
-  },
-];
-let nextId = 4;
-const latency = () => new Promise((r) => setTimeout(r, 200));
-/* ---------- /DUMMY STORE ---------- */
+// POST /items body (CreateItemReq). The server requires itemName, manufacturer and
+// manufacturerPart to be non-empty, and quantity to be present (0 is fine).
+export interface NewItem {
+  itemName: string;
+  quantity: number;
+  manufacturer: string;
+  manufacturerPart: string;
+  distributorPart?: string;
+  distributorURL?: string;
+  dataSheetURL?: string;
+  description?: string;
+  logDescription?: string; // note recorded in the changelog
+}
 
-// GET /  ->  Item[]   (all available item data)
+// PUT /items/{id} body (UpdateItemReq). All fields optional, but at least one is required.
+// Note the description field is `itemDescription` here, but `description` on create.
+export interface UpdateItem {
+  itemName?: string;
+  quantity?: number;
+  manufacturer?: string;
+  manufacturerPart?: string;
+  distributorPart?: string;
+  distributorURL?: string;
+  dataSheetURL?: string;
+  itemDescription?: string;
+  logDescription?: string;
+}
+
+async function request(path: string, init: RequestInit, errorPrefix: string): Promise<Response> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    credentials: 'include',
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...init.headers },
+  });
+  if (!res.ok) {
+    // The API reports errors as { "error": "..." }.
+    const body = await res.json().catch(() => null);
+    const detail = body && typeof body.error === 'string' ? body.error : '';
+    throw new Error(`${errorPrefix} (${res.status})${detail ? `: ${detail}` : ''}`);
+  }
+  return res;
+}
+
+// GET /items -> { items: Item[] }   (items is null when the table is empty)
 export const getItems = async (): Promise<Item[]> => {
-  await latency();
-  // const res = await fetch(`${BASE_URL}/`, { credentials: 'include' });
-  // if (!res.ok) throw new Error(`Failed to load items (${res.status})`);
-  // return res.json();
-  return db.map((i) => ({ ...i }));
+  const res = await request('/items', { method: 'GET' }, 'Failed to load items');
+  const body: { items: ServerItem[] | null } = await res.json();
+  return (body.items ?? []).map(fromServer);
 };
 
-// GET /:id  ->  Item
-export const getItem = async (id: number): Promise<Item> => {
-  await latency();
-  // const res = await fetch(`${BASE_URL}/${id}`, { credentials: 'include' });
-  // if (!res.ok) throw new Error(`Failed to load item (${res.status})`);
-  // return res.json();
-  const found = db.find((i) => i.ID === id);
-  if (!found) throw new Error('Item not found');
-  return { ...found };
+// GET /items/{id} -> { item: Item }
+export const getItem = async (id: string): Promise<Item> => {
+  const res = await request(`/items/${id}`, { method: 'GET' }, 'Failed to load item');
+  const body: { item: ServerItem } = await res.json();
+  return fromServer(body.item);
 };
 
-// POST /  { Action: 'CREATE', ...item }  ->  Item (with its new ID)
+// POST /items -> 201 { item: Item }
 export const createItem = async (item: NewItem): Promise<Item> => {
-  await latency();
-  // const res = await fetch(`${BASE_URL}/`, {
-  //   method: 'POST',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   credentials: 'include',
-  //   body: JSON.stringify({ Action: 'CREATE' satisfies ItemAction, ...item }),
-  // });
-  // if (!res.ok) throw new Error(`Failed to create item (${res.status})`);
-  // return res.json();
-  const created: Item = { ID: nextId++, ...item };
-  db = [created, ...db];
-  return { ...created };
+  const res = await request(
+    '/items',
+    { method: 'POST', body: JSON.stringify(item) },
+    'Failed to create item'
+  );
+  const body: { item: ServerItem } = await res.json();
+  return fromServer(body.item);
 };
 
-// PUT /:id  { Action: 'ADDED' | 'TAKEN', Quantity: amount }  ->  Item (with the new quantity)
-// TODO: confirm the body field name for the amount.
+// PUT /items/{id} -> 200 { item: Item } (the updated item)
+export const updateItem = async (id: string, changes: UpdateItem): Promise<Item> => {
+  const res = await request(
+    `/items/${id}`,
+    { method: 'PUT', body: JSON.stringify(changes) },
+    'Failed to update item'
+  );
+  const body: { item: ServerItem } = await res.json();
+  return fromServer(body.item);
+};
+
+// The server stores an absolute quantity and works out ADDED / TAKEN / MODIFIED for the
+// changelog itself from the difference, so this reads the current quantity, applies the
+// delta, and PUTs the result. Not atomic: two people adjusting the same item at once can
+// overwrite each other.
 export const adjustItem = async (
-  id: number,
+  id: string,
   action: 'ADDED' | 'TAKEN',
-  amount: number
+  amount: number,
+  note?: string
 ): Promise<Item> => {
-  await latency();
-  // const res = await fetch(`${BASE_URL}/${id}`, {
-  //   method: 'PUT',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   credentials: 'include',
-  //   body: JSON.stringify({ Action: action, Quantity: amount }),
-  // });
-  // if (!res.ok) throw new Error(`Failed to update quantity (${res.status})`);
-  // return res.json();
-  const found = db.find((i) => i.ID === id);
-  if (!found) throw new Error('Item not found');
-  if (action === 'TAKEN' && found.Quantity < amount) throw new Error('Not enough in stock');
-  found.Quantity += action === 'ADDED' ? amount : -amount;
-  return { ...found };
+  const current = await getItem(id);
+  if (action === 'TAKEN' && current.quantity < amount) throw new Error('Not enough in stock');
+  const quantity = current.quantity + (action === 'ADDED' ? amount : -amount);
+  return updateItem(id, { quantity, logDescription: note });
 };
 
-// DELETE /:id  { Action: 'DELETE' }
-export const deleteItem = async (id: number): Promise<void> => {
-  await latency();
-  // const res = await fetch(`${BASE_URL}/${id}`, {
-  //   method: 'DELETE',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   credentials: 'include',
-  //   body: JSON.stringify({ Action: 'DELETE' satisfies ItemAction }),
-  // });
-  // if (!res.ok) throw new Error(`Failed to delete item (${res.status})`);
-  db = db.filter((i) => i.ID !== id);
+// DELETE /items/{id} -> 204, no body (the server logs the deletion)
+export const deleteItem = async (id: string): Promise<void> => {
+  await request(`/items/${id}`, { method: 'DELETE' }, 'Failed to delete item');
 };
