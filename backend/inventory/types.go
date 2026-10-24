@@ -66,8 +66,14 @@ type CreateItemReq struct {
 }
 
 type ItemDTO struct {
-	ItemName     string     `gorm:"not null"`
-	ParentID     *uuid.UUID `gorm:"type:uuid;not null"`
-	Quantity     int32      `gorm:"type:integer;not null"`
-	Manufacturer string     `gorm:"not null"`
+	ItemName     string `gorm:"not null"`
+	Quantity     int32  `gorm:"type:integer;not null"`
+	Manufacturer string `gorm:"not null"`
+}
+
+type ItemCategory struct {
+	ID           uuid.UUID `gorm:"type:uuid;not null"`
+	CategoryName string    `gorm:"not null"`
+	ParentID     uuid.UUID
+	Parent       *ItemCategory `gorm:"foreignKey:ParentID;references:CategoryName"`
 }
