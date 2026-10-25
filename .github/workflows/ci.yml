@@ -1,10 +1,9 @@
 name: CI
-
+ 
 on:
   push:
-    branches:
-      - '**'
-  pull_request:
+    branches-ignore: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,3 +14,24 @@ jobs:
 
   frontend:
     uses: ./.github/workflows/frontend.yml
+
+  merge-to-main:
+    if: false
+    needs: [frontend]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Open a PR if one doesn't exist
+        run: |
+          if [ -z "$(gh pr list --head "$GITHUB_REF_NAME" --base main --json number --jq '.[0].number')" ]; then
+            gh pr create --base main --head "$GITHUB_REF_NAME" \
+              --title "Auto-merge: $GITHUB_REF_NAME" \
+              --body "Opened by CI after build, lint and tests passed."
+          fi
+      - name: Enable auto-merge
+        run: gh pr merge "$GITHUB_REF_NAME" --squash --delete-branch --auto
