@@ -14,7 +14,7 @@ import (
 func TestSignupOpen(t *testing.T) {
 	router, db := newAuthRouter(t)
 
-	if err := settings.Set(db, settings.SignupPolicy, "open"); err != nil {
+	if err := settings.Set(db, "signup_policy", "open"); err != nil {
 		t.Fatal(err)
 	}
 	user, token := newSignupSession(t, db, "new@example.com")
@@ -75,7 +75,7 @@ func TestSignupClosed(t *testing.T) {
 	router, db := newAuthRouter(t)
 	t.Setenv("ADMIN_EMAIL", "admin@example.com")
 
-	if err := settings.Set(db, settings.SignupPolicy, "closed"); err != nil {
+	if err := settings.Set(db, "signup_policy", "closed"); err != nil {
 		t.Fatal(err)
 	}
 	_, token := newSignupSession(t, db, "new@mun.ca")
@@ -91,7 +91,7 @@ func TestSignupClosed(t *testing.T) {
 func TestSignupInvalidPolicy(t *testing.T) {
 	_, db := newAuthRouter(t)
 
-	if err := settings.Set(db, settings.SignupPolicy, "invalid"); err != nil {
+	if err := settings.Set(db, "signup_policy", "invalid"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -108,7 +108,7 @@ func TestSignupInvalidWhitelist(t *testing.T) {
 	_, db := newAuthRouter(t)
 
 	for _, value := range []string{"invalid", "null", `"mun.ca"`, `[1]`} {
-		if err := settings.Set(db, settings.WhitelistedEmailDomains, value); err != nil {
+		if err := settings.Set(db, "whitelisted_email_domains", value); err != nil {
 			t.Fatal(err)
 		}
 
@@ -126,7 +126,7 @@ func TestExistingEnabledUserCanLoginWithClosedSignup(t *testing.T) {
 	router, db := newAuthRouter(t)
 	user, _ := newTestSession(t, db, "View")
 
-	if err := settings.Set(db, settings.SignupPolicy, "closed"); err != nil {
+	if err := settings.Set(db, "signup_policy", "closed"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -153,7 +153,7 @@ func TestExistingDisabledUserStaysDisabledWithOpenSignup(t *testing.T) {
 	if err := db.Model(&user).Update("disabled", true).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := settings.Set(db, settings.SignupPolicy, "open"); err != nil {
+	if err := settings.Set(db, "signup_policy", "open"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -188,7 +188,7 @@ func TestSignupBootstrapAdminBypassesClosedSignup(t *testing.T) {
 	router, db := newAuthRouter(t)
 	t.Setenv("ADMIN_EMAIL", "admin@example.com")
 
-	if err := settings.Set(db, settings.SignupPolicy, "closed"); err != nil {
+	if err := settings.Set(db, "signup_policy", "closed"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -203,7 +203,7 @@ func TestSignupEmptyAdminEmailDoesNotBypassPolicy(t *testing.T) {
 	_, db := newAuthRouter(t)
 	t.Setenv("ADMIN_EMAIL", "")
 
-	if err := settings.Set(db, settings.SignupPolicy, "closed"); err != nil {
+	if err := settings.Set(db, "signup_policy", "closed"); err != nil {
 		t.Fatal(err)
 	}
 

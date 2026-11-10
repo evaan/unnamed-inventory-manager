@@ -7,8 +7,8 @@ import (
 
 func SeedDefaults(db *gorm.DB) error {
 	defaults := []Setting{
-		{Name: SignupPolicy, Value: "whitelist"}, // Possible options: open, whitelist, closed
-		{Name: WhitelistedEmailDomains, Value: `["mun.ca"]`},
+		{Name: "signup_policy", Value: "whitelist"}, // Possible options: open, whitelist, closed
+		{Name: "whitelisted_email_domains", Value: `["mun.ca"]`},
 	}
 
 	return db.Clauses(clause.OnConflict{DoNothing: true}).Create(&defaults).Error

@@ -10,7 +10,7 @@ import (
 )
 
 func newUserDisabled(db *gorm.DB, email string) (bool, error) {
-	policy, err := settings.Get(db, settings.SignupPolicy)
+	policy, err := settings.Get(db, "signup_policy")
 	if err != nil {
 		return true, err
 	}
@@ -21,7 +21,7 @@ func newUserDisabled(db *gorm.DB, email string) (bool, error) {
 	case "closed":
 		return true, nil
 	case "whitelist":
-		value, err := settings.Get(db, settings.WhitelistedEmailDomains)
+		value, err := settings.Get(db, "whitelisted_email_domains")
 		if err != nil {
 			return true, err
 		}
