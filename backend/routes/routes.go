@@ -114,6 +114,14 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 		admin.PATCH("/user/:id", func(c *gin.Context) {
 			auth.PatchUser(c, db)
 		})
+
+		admin.GET("/user/:id", func(c *gin.Context) {
+			auth.GetUserByID(c, db)
+		})
+
+		admin.GET("/users", func(c *gin.Context) {
+			auth.GetUsers(c, db)
+		})
 	}
 
 	return nil
