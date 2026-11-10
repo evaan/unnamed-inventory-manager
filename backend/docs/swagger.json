@@ -445,6 +445,123 @@
                 }
             }
         },
+        "/user/{id}": {
+            "get": {
+                "description": "Get a user's ID, name, email, disabled status and permissions. Admin only, using the session cookie",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Get a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User details",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "disabled": {
+                                    "type": "boolean"
+                                },
+                                "email": {
+                                    "type": "string"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "permissions": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid user ID"
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Not an administrator or user disabled"
+                    },
+                    "404": {
+                        "description": "User not found"
+                    },
+                    "500": {
+                        "description": "Error getting user"
+                    }
+                }
+            }
+        },
+        "/users": {
+            "get": {
+                "description": "Get each user's ID, name, email, disabled status and permissions, ordered by email. Admin only, using the session cookie",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Get all users",
+                "responses": {
+                    "200": {
+                        "description": "User details",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "disabled": {
+                                        "type": "boolean"
+                                    },
+                                    "email": {
+                                        "type": "string"
+                                    },
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "permissions": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Not an administrator or user disabled"
+                    },
+                    "500": {
+                        "description": "Error getting users"
+                    }
+                }
+            }
+        },
         "/users/{id}": {
             "patch": {
                 "description": "Disable or enable a user. Admin only, using the session cookie",
