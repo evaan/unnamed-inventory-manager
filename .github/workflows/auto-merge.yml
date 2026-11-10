@@ -1,21 +1,37 @@
-name: Enable auto-merge
-
+name: CI
+ 
 on:
-  pull_request_target:
-    types: [opened, reopened, ready_for_review]
+  push:
+    branches-ignore: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  enable-auto-merge:
-    if: ${{ !github.event.pull_request.draft }}
+  backend:
+    uses: ./.github/workflows/backend.yml
+
+  frontend:
+    uses: ./.github/workflows/frontend.yml
+
+  merge-to-main:
+    if: false
+    needs: [frontend]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v4
+      - name: Open a PR if one doesn't exist
+        run: |
+          if [ -z "$(gh pr list --head "$GITHUB_REF_NAME" --base main --json number --jq '.[0].number')" ]; then
+            gh pr create --base main --head "$GITHUB_REF_NAME" \
+              --title "Auto-merge: $GITHUB_REF_NAME" \
+              --body "Opened by CI after build, lint and tests passed."
+          fi
       - name: Enable auto-merge
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: gh pr merge "$PR_NUMBER" --auto --squash
+        run: gh pr merge "$GITHUB_REF_NAME" --squash --delete-branch --auto
