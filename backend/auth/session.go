@@ -9,7 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// CreateLoginSession starts a session after the user's Google identity and email have been verified.
 func CreateLoginSession(db *gorm.DB, googleID, name, email string) (string, error) {
 	sessionToken := GenerateToken()
 	adminEmail := os.Getenv("ADMIN_EMAIL")
