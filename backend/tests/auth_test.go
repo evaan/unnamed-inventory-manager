@@ -442,6 +442,7 @@ func TestLogout(t *testing.T) {
 
 func newAuthRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	t.Helper()
+	t.Setenv("ADMIN_EMAIL", "")
 
 	db := newTestDB(t)
 	oauthCfg := &oauth2.Config{
