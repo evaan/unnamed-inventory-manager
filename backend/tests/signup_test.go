@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/evaandev/unnamed-inventory-manager/auth"
+	"github.com/evaandev/unnamed-inventory-manager/settings"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
-	"gitlab.com/evaandev/unnamed-inventory-manager/settings"
 	"gorm.io/gorm"
 )
 

@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/evaandev/unnamed-inventory-manager/auth"
 	"github.com/gin-gonic/gin"
-	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
 	"gorm.io/gorm"
 )
 

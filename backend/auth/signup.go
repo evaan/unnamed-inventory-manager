@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"gitlab.com/evaandev/unnamed-inventory-manager/settings"
+	"github.com/evaandev/unnamed-inventory-manager/settings"
 	"gorm.io/gorm"
 )
 

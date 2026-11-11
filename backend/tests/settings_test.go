@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/evaandev/unnamed-inventory-manager/auth"
+	"github.com/evaandev/unnamed-inventory-manager/database"
+	"github.com/evaandev/unnamed-inventory-manager/settings"
 	"github.com/gin-gonic/gin"
-	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
-	"gitlab.com/evaandev/unnamed-inventory-manager/database"
-	"gitlab.com/evaandev/unnamed-inventory-manager/settings"
 	"gorm.io/gorm"
 )
 
