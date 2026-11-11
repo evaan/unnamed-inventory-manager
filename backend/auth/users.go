@@ -8,54 +8,49 @@ import (
 	"gorm.io/gorm"
 )
 
-// @Summary		Update a user
-// @Description	Disable or enable a user. Admin only, using the session cookie
+// @Summary		Get all users
+// @Description	Get each user's ID, name, email, disabled status and permissions, ordered by email. Admin only, using the session cookie
 // @Tags			Auth
-// @Accept			json
-// @Param			id		path	string				true	"User ID"	Format(uuid)
-// @Param			body	body	PatchUserRequest	true	"Whether the user is disabled"
-// @Param			Origin	header	string				false	"Frontend origin, required if Referer is not set"
-// @Success		204		"User updated"
-// @Failure		400		"Invalid user ID or request body"
-// @Failure		401		"Not logged in"
-// @Failure		403		"Not an administrator or invalid frontend Origin or Referer"
-// @Failure		404		"User not found"
-// @Failure		500		"Error updating user"
-// @Router			/users/{id} [patch]
-func PatchUser(c *gin.Context, db *gorm.DB) {
+// @Produce		json
+// @Success		200	{array}	object{id=string,name=string,email=string,disabled=bool,permissions=[]string}	"User details"
+// @Failure		401	"Not logged in"
+// @Failure		403	"Not an administrator or user disabled"
+// @Failure		500	"Error getting users"
+// @Router			/users [get]
+func GetUsers(c *gin.Context, db *gorm.DB) {
 	db = db.WithContext(c.Request.Context())
 
-	userID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-
-	exists, err := DoesUserExist(db, userID.String())
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-	if !exists {
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-
-	var req PatchUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-
-	err = db.Transaction(func(tx *gorm.DB) error {
-		return tx.Model(&User{}).
-			Where("id = ?", userID).
-			Update("disabled", *req.Disabled).Error
-	})
-	if err != nil {
+	var users []User
+	if err := db.Order("email").Find(&users).Error; err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	var permissions []UserPermission
+	if err := db.Order("permission").Find(&permissions).Error; err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	userPermissions := make(map[uuid.UUID][]string)
+	for _, permission := range permissions {
+		userPermissions[permission.UserID] = append(userPermissions[permission.UserID], permission.Permission)
+	}
+
+	response := make([]gin.H, 0, len(users))
+	for _, user := range users {
+		permissions := userPermissions[user.ID]
+		if permissions == nil {
+			permissions = []string{}
+		}
+		response = append(response, gin.H{
+			"id":          user.ID,
+			"name":        user.Name,
+			"email":       user.Email,
+			"disabled":    user.Disabled,
+			"permissions": permissions,
+		})
+	}
+
+	c.JSON(http.StatusOK, response)
 }

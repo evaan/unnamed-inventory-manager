@@ -2,6 +2,7 @@ package tests
 
 import (
 	"net/http"
+	"sort"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -155,7 +156,7 @@ func TestRemovingAdminBlocksAdminActions(t *testing.T) {
 	response = makeRequest(router, http.MethodPut, path, `{"permissions":["Administrator"]}`, token)
 	requireStatus(t, response, http.StatusForbidden)
 
-	response = makeRequest(router, http.MethodPatch, "/users/"+user.ID.String(), `{"disabled":true}`, token)
+	response = makeRequest(router, http.MethodPatch, "/user/"+user.ID.String(), `{"disabled":true}`, token)
 	requireStatus(t, response, http.StatusForbidden)
 
 	response = makeRequest(router, http.MethodGet, "/whoami", "", userToken)
@@ -169,11 +170,219 @@ func TestRemovingAdminBlocksAdminActions(t *testing.T) {
 	})
 }
 
+func TestGetUsers(t *testing.T) {
+	router, db := newAuthRouter(t)
+	admin, token := newTestSession(t, db, auth.PermissionAdministrator)
+	user, _ := newTestSession(t, db, "View", "Edit")
+	userWithoutPermissions, _ := newTestSession(t, db)
+
+	response := makeRequest(router, http.MethodGet, "/users", "", token)
+	requireStatus(t, response, http.StatusOK)
+	expected := []gin.H{
+		{
+			"id":          admin.ID.String(),
+			"name":        admin.Name,
+			"email":       admin.Email,
+			"disabled":    false,
+			"permissions": []string{auth.PermissionAdministrator},
+		},
+		{
+			"id":          user.ID.String(),
+			"name":        user.Name,
+			"email":       user.Email,
+			"disabled":    false,
+			"permissions": []string{"Edit", "View"},
+		},
+		{
+			"id":          userWithoutPermissions.ID.String(),
+			"name":        userWithoutPermissions.Name,
+			"email":       userWithoutPermissions.Email,
+			"disabled":    false,
+			"permissions": []string{},
+		},
+	}
+	sort.Slice(expected, func(i, j int) bool {
+		return expected[i]["email"].(string) < expected[j]["email"].(string)
+	})
+	assertJSON(t, response, expected)
+}
+
+func TestGetUsersIncludesDisabledUsers(t *testing.T) {
+	router, db := newAuthRouter(t)
+	admin, token := newTestSession(t, db, auth.PermissionAdministrator)
+	user, _ := newTestSession(t, db, "View")
+
+	if err := db.Model(&user).Update("disabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	response := makeRequest(router, http.MethodGet, "/users", "", token)
+	requireStatus(t, response, http.StatusOK)
+	expected := []gin.H{
+		{
+			"id":          admin.ID.String(),
+			"name":        admin.Name,
+			"email":       admin.Email,
+			"disabled":    false,
+			"permissions": []string{auth.PermissionAdministrator},
+		},
+		{
+			"id":          user.ID.String(),
+			"name":        user.Name,
+			"email":       user.Email,
+			"disabled":    true,
+			"permissions": []string{"View"},
+		},
+	}
+	sort.Slice(expected, func(i, j int) bool {
+		return expected[i]["email"].(string) < expected[j]["email"].(string)
+	})
+	assertJSON(t, response, expected)
+}
+
+func TestGetUsersEmpty(t *testing.T) {
+	db := newTestDB(t)
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/users", func(c *gin.Context) {
+		auth.GetUsers(c, db)
+	})
+
+	response := makeRequest(router, http.MethodGet, "/users", "", "")
+	requireStatus(t, response, http.StatusOK)
+	assertJSON(t, response, []gin.H{})
+}
+
+func TestGetUsersUnauthenticated(t *testing.T) {
+	router, _ := newAuthRouter(t)
+
+	response := makeRequest(router, http.MethodGet, "/users", "", "")
+	requireStatus(t, response, http.StatusUnauthorized)
+}
+
+func TestRegularUserCannotGetUsers(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db, "View")
+
+	response := makeRequest(router, http.MethodGet, "/users", "", token)
+	requireStatus(t, response, http.StatusForbidden)
+}
+
+func TestDisabledAdminCannotGetUsers(t *testing.T) {
+	router, db := newAuthRouter(t)
+	admin, token := newTestSession(t, db, auth.PermissionAdministrator)
+
+	if err := db.Model(&admin).Update("disabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	response := makeRequest(router, http.MethodGet, "/users", "", token)
+	requireStatus(t, response, http.StatusForbidden)
+}
+
+func TestGetUser(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
+	user, _ := newTestSession(t, db, "View", "Edit")
+
+	response := makeRequest(router, http.MethodGet, "/user/"+user.ID.String(), "", adminToken)
+	requireStatus(t, response, http.StatusOK)
+	assertJSON(t, response, gin.H{
+		"id":          user.ID.String(),
+		"name":        user.Name,
+		"email":       user.Email,
+		"disabled":    false,
+		"permissions": []string{"Edit", "View"},
+	})
+}
+
+func TestGetUserWithoutPermissions(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
+	user, _ := newTestSession(t, db)
+
+	response := makeRequest(router, http.MethodGet, "/user/"+user.ID.String(), "", adminToken)
+	requireStatus(t, response, http.StatusOK)
+	assertJSON(t, response, gin.H{
+		"id":          user.ID.String(),
+		"name":        user.Name,
+		"email":       user.Email,
+		"disabled":    false,
+		"permissions": []string{},
+	})
+}
+
+func TestGetDisabledUser(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
+	user, _ := newTestSession(t, db, "View")
+
+	if err := db.Model(&user).Update("disabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	response := makeRequest(router, http.MethodGet, "/user/"+user.ID.String(), "", adminToken)
+	requireStatus(t, response, http.StatusOK)
+	assertJSON(t, response, gin.H{
+		"id":          user.ID.String(),
+		"name":        user.Name,
+		"email":       user.Email,
+		"disabled":    true,
+		"permissions": []string{"View"},
+	})
+}
+
+func TestGetUnknownUser(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db, auth.PermissionAdministrator)
+
+	response := makeRequest(router, http.MethodGet, "/user/"+uuid.NewString(), "", token)
+	requireStatus(t, response, http.StatusNotFound)
+}
+
+func TestGetUserInvalidID(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db, auth.PermissionAdministrator)
+
+	response := makeRequest(router, http.MethodGet, "/user/invalid", "", token)
+	requireStatus(t, response, http.StatusBadRequest)
+}
+
+func TestGetUserUnauthenticated(t *testing.T) {
+	router, db := newAuthRouter(t)
+	user, _ := newTestSession(t, db)
+
+	response := makeRequest(router, http.MethodGet, "/user/"+user.ID.String(), "", "")
+	requireStatus(t, response, http.StatusUnauthorized)
+}
+
+func TestRegularUserCannotGetUser(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db, "View")
+	user, _ := newTestSession(t, db)
+
+	response := makeRequest(router, http.MethodGet, "/user/"+user.ID.String(), "", token)
+	requireStatus(t, response, http.StatusForbidden)
+}
+
+func TestDisabledAdminCannotGetUser(t *testing.T) {
+	router, db := newAuthRouter(t)
+	admin, token := newTestSession(t, db, auth.PermissionAdministrator)
+	user, _ := newTestSession(t, db)
+
+	if err := db.Model(&admin).Update("disabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	response := makeRequest(router, http.MethodGet, "/user/"+user.ID.String(), "", token)
+	requireStatus(t, response, http.StatusForbidden)
+}
+
 func TestDisableAndEnableUser(t *testing.T) {
 	router, db := newAuthRouter(t)
 	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
 	user, token := newTestSession(t, db, "View")
-	path := "/users/" + user.ID.String()
+	path := "/user/" + user.ID.String()
 
 	response := makeRequest(router, http.MethodPatch, path, `{"disabled":true}`, adminToken)
 	requireStatus(t, response, http.StatusNoContent)
@@ -211,7 +420,7 @@ func TestRegularUserCannotDisableUser(t *testing.T) {
 	_, token := newTestSession(t, db)
 	user, userToken := newTestSession(t, db)
 
-	response := makeRequest(router, http.MethodPatch, "/users/"+user.ID.String(), `{"disabled":true}`, token)
+	response := makeRequest(router, http.MethodPatch, "/user/"+user.ID.String(), `{"disabled":true}`, token)
 	requireStatus(t, response, http.StatusForbidden)
 
 	response = makeRequest(router, http.MethodGet, "/permissions", "", userToken)

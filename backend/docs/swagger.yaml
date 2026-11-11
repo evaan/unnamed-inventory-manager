@@ -367,6 +367,85 @@ paths:
       summary: Replace a user's permissions
       tags:
       - Auth
+  /user/{id}:
+    get:
+      description: Get a user's ID, name, email, disabled status and permissions.
+        Admin only, using the session cookie
+      parameters:
+      - description: User ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User details
+          schema:
+            properties:
+              disabled:
+                type: boolean
+              email:
+                type: string
+              id:
+                type: string
+              name:
+                type: string
+              permissions:
+                items:
+                  type: string
+                type: array
+            type: object
+        "400":
+          description: Invalid user ID
+        "401":
+          description: Not logged in
+        "403":
+          description: Not an administrator or user disabled
+        "404":
+          description: User not found
+        "500":
+          description: Error getting user
+      summary: Get a user
+      tags:
+      - Auth
+  /users:
+    get:
+      description: Get each user's ID, name, email, disabled status and permissions,
+        ordered by email. Admin only, using the session cookie
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User details
+          schema:
+            items:
+              properties:
+                disabled:
+                  type: boolean
+                email:
+                  type: string
+                id:
+                  type: string
+                name:
+                  type: string
+                permissions:
+                  items:
+                    type: string
+                  type: array
+              type: object
+            type: array
+        "401":
+          description: Not logged in
+        "403":
+          description: Not an administrator or user disabled
+        "500":
+          description: Error getting users
+      summary: Get all users
+      tags:
+      - Auth
   /users/{id}:
     patch:
       consumes:
