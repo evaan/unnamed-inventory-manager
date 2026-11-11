@@ -5,10 +5,10 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/evaandev/unnamed-inventory-manager/auth"
+	"github.com/evaandev/unnamed-inventory-manager/routes"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
-	"gitlab.com/evaandev/unnamed-inventory-manager/routes"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"gorm.io/gorm"

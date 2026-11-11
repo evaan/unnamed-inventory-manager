@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/evaandev/unnamed-inventory-manager/auth"
+	"github.com/evaandev/unnamed-inventory-manager/database"
 	"github.com/google/uuid"
-	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
-	"gitlab.com/evaandev/unnamed-inventory-manager/database"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )

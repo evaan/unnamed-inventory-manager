@@ -1,9 +1,9 @@
 package database
 
 import (
-	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
-	"gitlab.com/evaandev/unnamed-inventory-manager/inventory"
-	"gitlab.com/evaandev/unnamed-inventory-manager/settings"
+	"github.com/evaandev/unnamed-inventory-manager/auth"
+	"github.com/evaandev/unnamed-inventory-manager/inventory"
+	"github.com/evaandev/unnamed-inventory-manager/settings"
 	"gorm.io/gorm"
 )
 

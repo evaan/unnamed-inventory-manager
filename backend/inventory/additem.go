@@ -5,8 +5,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/evaandev/unnamed-inventory-manager/auth"
 	"github.com/gin-gonic/gin"
-	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
 	"gorm.io/gorm"
 )
 
