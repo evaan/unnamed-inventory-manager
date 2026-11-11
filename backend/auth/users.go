@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -26,23 +25,14 @@ func GetUsers(c *gin.Context, db *gorm.DB) {
 		return
 	}
 
-	var permissions []UserPermission
-	if err := db.Order("permission").Find(&permissions).Error; err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-
-	userPermissions := make(map[uuid.UUID][]string)
-	for _, permission := range permissions {
-		userPermissions[permission.UserID] = append(userPermissions[permission.UserID], permission.Permission)
-	}
-
 	response := make([]gin.H, 0, len(users))
 	for _, user := range users {
-		permissions := userPermissions[user.ID]
-		if permissions == nil {
-			permissions = []string{}
+		permissions, err := GetUserPermissions(db, user.ID)
+		if err != nil {
+			c.AbortWithError(http.StatusInternalServerError, err)
+			return
 		}
+
 		response = append(response, gin.H{
 			"id":          user.ID,
 			"name":        user.Name,

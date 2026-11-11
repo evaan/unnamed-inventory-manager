@@ -14,6 +14,7 @@ import (
 	_ "gitlab.com/evaandev/unnamed-inventory-manager/docs"
 	"gitlab.com/evaandev/unnamed-inventory-manager/inventory"
 	"gitlab.com/evaandev/unnamed-inventory-manager/middleware"
+	"gitlab.com/evaandev/unnamed-inventory-manager/settings"
 	"golang.org/x/oauth2"
 	"gorm.io/gorm"
 )
@@ -121,6 +122,14 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 
 		admin.GET("/users", func(c *gin.Context) {
 			auth.GetUsers(c, db)
+		})
+
+		admin.GET("/settings", func(c *gin.Context) {
+			settings.GetSettings(c, db)
+		})
+
+		admin.PATCH("/settings", func(c *gin.Context) {
+			settings.PatchSettings(c, db)
 		})
 	}
 
