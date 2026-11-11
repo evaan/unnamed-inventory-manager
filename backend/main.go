@@ -4,10 +4,10 @@ import (
 	"log"
 	"os"
 
+	"github.com/evaandev/unnamed-inventory-manager/database"
+	"github.com/evaandev/unnamed-inventory-manager/routes"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"gitlab.com/evaandev/unnamed-inventory-manager/database"
-	"gitlab.com/evaandev/unnamed-inventory-manager/routes"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )

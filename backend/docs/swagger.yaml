@@ -63,6 +63,10 @@ definitions:
       quantity:
         type: integer
     type: object
+  settings.PatchSettingsRequest:
+    additionalProperties:
+      type: string
+    type: object
 host: localhost:8081
 info:
   contact: {}
@@ -73,8 +77,10 @@ info:
 paths:
   /callback:
     get:
-      description: Checks the oauth_state cookie, starts a session and sends you back
-        to the frontend
+      description: |-
+        Checks the oauth_state cookie, verifies the Google identity and email, starts a session and sends you back to the frontend.
+        New users follow signup_policy: open enables them, whitelist enables exact whitelisted email domain matches, and closed creates them disabled for approval.
+        A matching non-empty ADMIN_EMAIL bypasses signup restrictions for new users. Existing users keep their disabled status
       parameters:
       - description: OAuth state from Google
         in: query
@@ -103,7 +109,7 @@ paths:
         "409":
           description: User details already in use
         "500":
-          description: Error logging in
+          description: Error logging in or invalid signup settings
       summary: Finish logging in with Google
       tags:
       - Auth
@@ -367,6 +373,62 @@ paths:
       summary: Replace a user's permissions
       tags:
       - Auth
+  /settings:
+    get:
+      description: Get all setting names and their string values. Lists are stored
+        as JSON-encoded strings. Admin only, using the session cookie
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Application settings
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Not logged in
+        "403":
+          description: Not an administrator or user disabled
+        "500":
+          description: Error getting settings
+      summary: Get settings
+      tags:
+      - Settings
+    patch:
+      consumes:
+      - application/json
+      description: |-
+        Update existing settings by name. Values must be strings; encode lists as JSON strings. Omitted settings are unchanged.
+        All updates are applied together, and unknown names are rejected. Admin only, using the session cookie
+      parameters:
+      - description: Setting names mapped to string values
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/settings.PatchSettingsRequest'
+      - description: Frontend origin, required if Referer is not set
+        in: header
+        name: Origin
+        type: string
+      responses:
+        "204":
+          description: Settings updated
+        "400":
+          description: Invalid request body, non-string value, or no settings provided
+        "401":
+          description: Not logged in
+        "403":
+          description: Not an administrator, user disabled, or invalid frontend Origin
+            or Referer
+        "404":
+          description: Setting not found
+        "500":
+          description: Error updating settings
+      summary: Update settings
+      tags:
+      - Settings
   /user/{id}:
     get:
       description: Get a user's ID, name, email, disabled status and permissions.

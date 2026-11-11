@@ -4,19 +4,18 @@ import (
 	"crypto/subtle"
 	"errors"
 	"net/http"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/idtoken"
 	"gorm.io/gorm"
 )
 
 // @Summary		Finish logging in with Google
-// @Description	Checks the oauth_state cookie, starts a session and sends you back to the frontend
+// @Description	Checks the oauth_state cookie, verifies the Google identity and email, starts a session and sends you back to the frontend.
+// @Description	New users follow signup_policy: open enables them, whitelist enables exact whitelisted email domain matches, and closed creates them disabled for approval.
+// @Description	A matching non-empty ADMIN_EMAIL bypasses signup restrictions for new users. Existing users keep their disabled status
 // @Tags			Auth
 // @Param			state	query	string	true	"OAuth state from Google"
 // @Param			code	query	string	true	"Authorization code from Google"
@@ -26,7 +25,7 @@ import (
 // @Failure		400		"Missing code or invalid OAuth state"
 // @Failure		401		"Invalid Google login or unverified email"
 // @Failure		409		"User details already in use"
-// @Failure		500		"Error logging in"
+// @Failure		500		"Error logging in or invalid signup settings"
 // @Router			/callback [get]
 func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL string) {
 	state := c.Query("state")
@@ -72,39 +71,12 @@ func Callback(c *gin.Context, oauthCfg *oauth2.Config, db *gorm.DB, frontendURL 
 		return
 	}
 
-	sessionToken := GenerateToken()
-	var user User
-	status := http.StatusInternalServerError
-	err = db.Transaction(func(tx *gorm.DB) error {
-		err := tx.Where("google_id = ?", payload.Subject).First(&user).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			user = User{ID: uuid.New(), Name: name, Email: email, GoogleID: payload.Subject, Disabled: false}
-			if err := tx.Create(&user).Error; err != nil {
-				if errors.Is(err, gorm.ErrDuplicatedKey) {
-					status = http.StatusConflict
-				}
-				return err
-			}
-		} else if err != nil {
-			return err
-		}
-		if !user.Disabled && email == os.Getenv("ADMIN_EMAIL") {
-			var count int64
-			if err := tx.Model(&UserPermission{}).Where("permission = ?", PermissionAdministrator).Count(&count).Error; err != nil {
-				return err
-			}
-			if count == 0 {
-				if err := tx.Create(&UserPermission{UserID: user.ID, Permission: PermissionAdministrator}).Error; err != nil {
-					return err
-				}
-			}
-		}
-
-		return tx.Create(&UserSession{
-			UserID: user.ID, SessionToken: HashToken(sessionToken), Expires: time.Now().Add(8 * time.Hour),
-		}).Error
-	})
+	sessionToken, err := CreateLoginSession(db, payload.Subject, name, email)
 	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			status = http.StatusConflict
+		}
 		c.AbortWithStatus(status)
 		return
 	}

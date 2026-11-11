@@ -7,13 +7,14 @@ import (
 	"path"
 	"strings"
 
+	"github.com/evaandev/unnamed-inventory-manager/auth"
+	_ "github.com/evaandev/unnamed-inventory-manager/docs"
+	"github.com/evaandev/unnamed-inventory-manager/inventory"
+	"github.com/evaandev/unnamed-inventory-manager/middleware"
+	"github.com/evaandev/unnamed-inventory-manager/settings"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
-	_ "gitlab.com/evaandev/unnamed-inventory-manager/docs"
-	"gitlab.com/evaandev/unnamed-inventory-manager/inventory"
-	"gitlab.com/evaandev/unnamed-inventory-manager/middleware"
 	"golang.org/x/oauth2"
 	"gorm.io/gorm"
 )
@@ -121,6 +122,14 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 
 		admin.GET("/users", func(c *gin.Context) {
 			auth.GetUsers(c, db)
+		})
+
+		admin.GET("/settings", func(c *gin.Context) {
+			settings.GetSettings(c, db)
+		})
+
+		admin.PATCH("/settings", func(c *gin.Context) {
+			settings.PatchSettings(c, db)
 		})
 	}
 
