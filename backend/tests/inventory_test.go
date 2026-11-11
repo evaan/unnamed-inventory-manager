@@ -9,8 +9,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
-	"gitlab.com/evaandev/unnamed-inventory-manager/inventory"
+	"github.com/evaandev/unnamed-inventory-manager/auth"
+	"github.com/evaandev/unnamed-inventory-manager/inventory"
 )
 
 func TestAddItem(t *testing.T) {
