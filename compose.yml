@@ -1,15 +1,30 @@
 name: inventory
 
 services:
+  traefik:
+    image: traefik:v3
+    restart: always
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:8081
+        VITE_API_URL: /api
     restart: always
-    ports:
-      - "8080:8080"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.frontend.rule: Host(`inventory.evaan.dev`)
+      traefik.http.routers.frontend.entrypoints: web
+      traefik.http.services.frontend.loadbalancer.server.port: "8080"
 
   backend:
     restart: always
@@ -19,14 +34,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "8081:8080"
     environment:
+      GIN_MODE: release
       POSTGRES_URL: postgresql://admin:admin@postgres:5432/inventory?sslmode=disable
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_REDIRECT_URL: http://localhost:8081/callback
-      FRONTEND_URL: http://localhost:8080
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in .env}
+      GOOGLE_REDIRECT_URL: https://inventory.evaan.dev/api/callback
+      FRONTEND_URL: https://inventory.evaan.dev/app
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.backend.rule: Host(`inventory.evaan.dev`) && (Path(`/api`) || PathPrefix(`/api/`))
+      traefik.http.routers.backend.entrypoints: web
+      traefik.http.routers.backend.middlewares: api-strip-prefix
+      traefik.http.middlewares.api-strip-prefix.stripprefix.prefixes: /api
+      traefik.http.services.backend.loadbalancer.server.port: "8080"
 
   postgres:
     image: postgres:alpine

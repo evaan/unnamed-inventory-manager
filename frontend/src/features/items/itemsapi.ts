@@ -1,4 +1,4 @@
-// Item API client for the Unnamed Inventory Manager API (Go/gin backend, localhost:8081).
+// Item API client for the Unnamed Inventory Manager API (Go/gin backend).
 // Auth is a session cookie set by /login -> /callback, so every request sends credentials.
 //
 // Note the backend's naming split:
@@ -6,7 +6,7 @@
 //   - responses use PascalCase, because the Go `Item` struct has no json tags
 // The app uses camelCase everywhere, so responses are converted in `fromServer` below.
 
-const BASE_URL = 'http://localhost:8081';
+const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/+$/, '');
 
 // Shape of an item as the server returns it.
 interface ServerItem {
