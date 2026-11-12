@@ -63,6 +63,10 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 			inventory.GetItems(c, db)
 		})
 
+		public.GET("/categories", func(c *gin.Context) {
+			inventory.GetCategories(c, db)
+		})
+
 		public.GET("items/:id", func(c *gin.Context) {
 			inventory.GetItemByID(c, db)
 		})
