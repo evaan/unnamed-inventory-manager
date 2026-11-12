@@ -34,4 +34,4 @@ jobs:
               --body "Opened by CI after build, lint and tests passed."
           fi
       - name: Enable auto-merge
-        run: gh pr merge "$GITHUB_REF_NAME" --squash --delete-branch --auto
+        run: gh pr merge "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --squash --delete-branch --auto
