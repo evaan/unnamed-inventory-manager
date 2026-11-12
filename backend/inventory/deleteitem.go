@@ -23,7 +23,7 @@ import (
 // @Router			/items/{id} [delete]
 func DeleteItem(c *gin.Context, db *gorm.DB) {
 	// TODO: create req object with log description
-	user, err := auth.GetUser(c)
+	user, err := auth.GetUser(c)fghjkl
 	if err != nil {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
