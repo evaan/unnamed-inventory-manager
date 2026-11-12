@@ -8,12 +8,13 @@ import (
 )
 
 type Item struct {
-	ID               uuid.UUID `gorm:"type:uuid;primaryKey"`
-	ItemName         string    `gorm:"not null"`
-	Quantity         int32     `gorm:"type:integer;not null"`
-	Manufacturer     string    `gorm:"not null"`
-	ManufacturerPart string    `gorm:"not null"`
-	DistributorPart  string    // Digikey or McMaster part number
+	ID               uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	ItemName         string         `gorm:"not null"`
+	Quantity         int32          `gorm:"type:integer;not null"`
+	Manufacturer     string         `gorm:"not null"`
+	ManufacturerPart string         `gorm:"not null"`
+	Category         []ItemCategory `gorm:"many2many:ItemCategoryLinks;"`
+	DistributorPart  string         // Digikey or McMaster part number
 	DistributorURL   string
 	DataSheetURL     string
 	Description      string
@@ -72,8 +73,8 @@ type ItemDTO struct {
 }
 
 type ItemCategory struct {
-	ID           uuid.UUID `gorm:"type:uuid;not null"`
+	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
 	CategoryName string    `gorm:"not null"`
-	ParentID     uuid.UUID
-	Parent       *ItemCategory `gorm:"foreignKey:ParentID;references:CategoryName"`
+	ParentID     *uuid.UUID
+	Parent       *ItemCategory `gorm:"foreignKey:ParentID;references:ID"`
 }
