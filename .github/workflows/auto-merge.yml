@@ -16,8 +16,8 @@ jobs:
     uses: ./.github/workflows/frontend.yml
 
   merge-to-main:
-    if: false
-    needs: [frontend]
+    if: github.ref_type == 'branch' && github.ref_name != 'main'
+    needs: [backend, frontend]
     runs-on: ubuntu-latest
     permissions:
       contents: write
