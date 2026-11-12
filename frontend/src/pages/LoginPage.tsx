@@ -1,18 +1,20 @@
+import ParticlesBG from '../components/ParticlesBG';
+
 export const LoginPage = () => {
   return (
-    <div className="min-h-screen w-full bg-slate-800 flex items-center justify-center p-4">
-      
-      <div className="w-full max-w-md bg-slate-200 flex flex-col items-center justify-center rounded-2xl p-8 shadow-2xl border border-slate-300">
-        
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-slate-900">Welcome Back</h2>
-          <p className="text-sm text-slate-600 mt-1">Sign in to manage your inventory</p>
+    <div className="relative isolate flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-800 p-4">
+      <ParticlesBG />
+
+      <div className="relative z-10 flex w-full max-w-md flex-col items-center justify-center rounded-2xl border border-slate-300 bg-slate-200 p-8 shadow-2xl">
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-bold text-slate-900">Welcome</h1>
+          <p className="mt-1 text-sm text-slate-600">Sign in to manage your inventory</p>
         </div>
 
         <button
-          onClick={() => window.location.assign(`${import.meta.env.VITE_API_URL}/login`)} className="flex w-full items-center justify-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-700 border border-slate-300 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md active:scale-[0.98]"
+          onClick={() => window.location.assign(`${import.meta.env.VITE_API_URL}/login`)} className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-500"
         >
-          <svg className="h-5 w-5" viewBox="0 0 24 24">
+          <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
             <path
               fill="#4285F4"
               d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
