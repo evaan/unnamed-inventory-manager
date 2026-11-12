@@ -3,6 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoginPage } from './LoginPage';
 
+vi.mock('../components/ParticlesBG', () => ({
+  default: () => null,
+}));
+
 describe('LoginPage', () => {
   const assign = vi.fn();
 
@@ -20,7 +24,7 @@ describe('LoginPage', () => {
 
   it('renders the welcome heading and subtitle', () => {
     render(<LoginPage />);
-    expect(screen.getByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^welcome$/i })).toBeInTheDocument();
     expect(screen.getByText(/sign in to manage your inventory/i)).toBeInTheDocument();
   });
 
