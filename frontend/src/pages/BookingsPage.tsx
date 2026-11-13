@@ -24,7 +24,6 @@ const BOOKINGS_PATH = '/app/bookings';
 /* ---------- Date helpers ---------- */
 const pad = (n: number) => String(n).padStart(2, '0');
 const toDateInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const toTimeInput = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const startOfDay = (dateStr: string) => new Date(`${dateStr}T00:00`);
 const fmtTime = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();

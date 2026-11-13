@@ -28,7 +28,7 @@ export interface Booking {
 export type NewBooking = Pick<Booking, 'EquipmentID' | 'Start' | 'End' | 'Purpose'>;
 
 /* ---------- DUMMY STORE (remove when the API is live) ---------- */
-let equipment: Equipment[] = [
+const equipment: Equipment[] = [
   { ID: 1, Name: 'Prusa MK4 #1', Category: '3D printers', Location: 'Maker bench A', Description: 'FDM printer, 250 × 210 × 220 mm build volume. PLA and PETG loaded.', Status: 'ACTIVE' },
   { ID: 2, Name: 'Prusa MK4 #2', Category: '3D printers', Location: 'Maker bench A', Description: 'FDM printer, 250 × 210 × 220 mm build volume. PLA loaded.', Status: 'ACTIVE' },
   { ID: 3, Name: 'Bambu Lab X1 Carbon', Category: '3D printers', Location: 'Maker bench B', Description: 'Enclosed CoreXY printer with multi-material AMS. Ask before printing ABS or ASA.', Status: 'ACTIVE' },
