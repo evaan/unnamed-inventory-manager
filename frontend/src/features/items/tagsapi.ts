@@ -1,155 +1,127 @@
-// Item API client for the Unnamed Inventory Manager API (Go/gin backend).
-// Auth is a session cookie set by /login -> /callback, so every request sends credentials.
+// Dummy tag API, same approach as itemsapi.ts: backed by in-memory data until the backend is wired in.
+// To go live: delete the DUMMY STORE section and swap each function body for the fetch shown in its comment.
 //
-// Note the backend's naming split:
-//   - request bodies use camelCase (CreateItemReq / UpdateItemReq have json tags)
-//   - responses use PascalCase, because the Go `Item` struct has no json tags
-// The app uses camelCase everywhere, so responses are converted in `fromServer` below.
+// Backend routes (tags.go):
+//   GET    /tags                      -> { tags: [{id, name}] }
+//   POST   /tags   { name }           -> 201 { tag }   (409 if the name exists, any casing)
+//   DELETE /tags/:id                  -> 204           (also detaches the tag from every item)
+//   PUT    /items/:id/tags { tag_ids } -> { item }     (replaces the item's whole tag set)
+// GET /items must return each item's tags (db.Preload("Tags")); map them with normalizeTag.
 
-import { normalizeTag, type RawTag, type Tag } from './tagsapi';
+export type TagID = string; // uuid on the backend
 
-const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/+$/, '');
-
-// Shape of an item as the server returns it.
-interface ServerItem {
-  ID: string; // uuid
-  ItemName: string;
-  Quantity: number;
-  Manufacturer: string;
-  ManufacturerPart: string;
-  DistributorPart: string;
-  DistributorURL: string;
-  DataSheetURL: string;
-  Description: string;
-  // Filled in by the API. Change tags with setItemTags in tagsapi.ts.
-  // Live: map the backend's `tags` array with normalizeTag from tagsapi.ts.
-  Tags?: RawTag[] | null;
+export interface Tag {
+  ID: TagID;
+  Name: string;
 }
 
-// Item as the app uses it. Optional text fields come back as '' when unset.
-export interface Item {
-  id: string;
-  itemName: string;
-  quantity: number;
-  manufacturer: string;
-  manufacturerPart: string;
-  distributorPart: string;
-  distributorURL: string;
-  dataSheetURL: string;
-  description: string;
-  // Tags on the item. Undefined if the server didn't include them. Change with setItemTags in tagsapi.ts.
-  Tags?: Tag[];
-}
+// Mirrors Item with the tags field. Item in itemsapi.ts already has `Tags?: Tag[]`, so this is a convenience alias.
+export type WithTags<T> = T & { Tags?: Tag[] };
 
-const fromServer = (s: ServerItem): Item => ({
-  id: s.ID,
-  itemName: s.ItemName,
-  quantity: s.Quantity,
-  manufacturer: s.Manufacturer,
-  manufacturerPart: s.ManufacturerPart,
-  distributorPart: s.DistributorPart,
-  distributorURL: s.DistributorURL,
-  dataSheetURL: s.DataSheetURL,
-  description: s.Description,
-  Tags: s.Tags ? s.Tags.map(normalizeTag) : undefined,
+// A tag as the backend sends it: {id, name} (or {ID, Name} if the Go struct has no json tags).
+export type RawTag = { ID?: unknown; id?: unknown; Name?: unknown; name?: unknown };
+
+// Use this when mapping API responses, including the `tags` array on each item.
+export const normalizeTag = (raw: RawTag): Tag => ({
+  ID: String(raw.ID ?? raw.id),
+  Name: String(raw.Name ?? raw.name),
 });
 
-// POST /items body (CreateItemReq). The server requires itemName, manufacturer and
-// manufacturerPart to be non-empty, and quantity to be present (0 is fine).
-export interface NewItem {
-  itemName: string;
-  quantity: number;
-  manufacturer: string;
-  manufacturerPart: string;
-  distributorPart?: string;
-  distributorURL?: string;
-  dataSheetURL?: string;
-  description?: string;
-  logDescription?: string; // note recorded in the changelog
-}
+/* ---------- DUMMY STORE (remove when the API is live) ---------- */
+const SEED_TAG_NAMES = [
+  'Resistors',
+  'Capacitors',
+  'Inductors',
+  'Passives',
+  'Microcontrollers',
+  'ICs',
+  'Power',
+  'LEDs',
+  'Sensors',
+  'Connectors',
+  'Wireless',
+  'Switches',
+  'SMD',
+  'Through-hole',
+];
+let tagStore: Tag[] = SEED_TAG_NAMES.map((Name, i) => ({ ID: `tag-${i + 1}`, Name }));
+let nextTagId = tagStore.length + 1;
+// item ID -> tag IDs (matches the item_tags join table)
+const itemTagLinks = new Map<string, TagID[]>();
+const latency = () => new Promise((r) => setTimeout(r, 200));
 
-// PUT /items/{id} body (UpdateItemReq). All fields optional, but at least one is required.
-// Note the description field is `itemDescription` here, but `description` on create.
-export interface UpdateItem {
-  itemName?: string;
-  quantity?: number;
-  manufacturer?: string;
-  manufacturerPart?: string;
-  distributorPart?: string;
-  distributorURL?: string;
-  dataSheetURL?: string;
-  itemDescription?: string;
-  logDescription?: string;
-}
+// Used by the dummy itemsapi so items come back with their tags. Not needed once the backend preloads them.
+export const tagsForItem = (itemId: string): Tag[] =>
+  (itemTagLinks.get(itemId) ?? [])
+    .map((id) => tagStore.find((t) => t.ID === id))
+    .filter((t): t is Tag => !!t)
+    .map((t) => ({ ...t }));
+// Seeds the dummy links by tag name (used by the dummy item generator in itemsapi.ts).
+export const linkItemTags = (itemId: string, names: string[]) => {
+  itemTagLinks.set(
+    itemId,
+    names
+      .map((n) => tagStore.find((t) => t.Name === n)?.ID)
+      .filter((id): id is TagID => !!id)
+  );
+};
+export const forgetItemTags = (itemId: string) => {
+  itemTagLinks.delete(itemId);
+};
+/* ---------- /DUMMY STORE ---------- */
 
-async function request(path: string, init: RequestInit, errorPrefix: string): Promise<Response> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    credentials: 'include',
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init.headers },
-  });
-  if (!res.ok) {
-    // The API reports errors as { "error": "..." }.
-    const body = await res.json().catch(() => null);
-    const detail = body && typeof body.error === 'string' ? body.error : '';
-    throw new Error(`${errorPrefix} (${res.status})${detail ? `: ${detail}` : ''}`);
+// GET /tags  ->  { tags: Tag[] }
+export const getTags = async (): Promise<Tag[]> => {
+  await latency();
+  // const res = await fetch(`${BASE_URL}/tags`, { credentials: 'include' });
+  // if (!res.ok) throw new Error(`Failed to load tags (${res.status})`);
+  // return ((await res.json()).tags ?? []).map(normalizeTag);
+  return tagStore.map((t) => ({ ...t }));
+};
+
+// POST /tags  { name }  ->  { tag }
+export const createTag = async (name: string): Promise<Tag> => {
+  await latency();
+  // const res = await fetch(`${BASE_URL}/tags`, {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   credentials: 'include',
+  //   body: JSON.stringify({ name }),
+  // });
+  // const body = await res.json().catch(() => ({}));
+  // if (!res.ok) throw new Error(body.error ?? `Failed to create tag (${res.status})`);
+  // return normalizeTag(body.tag);
+  if (tagStore.some((t) => t.Name.toLowerCase() === name.toLowerCase())) {
+    throw new Error('A tag with that name already exists');
   }
-  return res;
-}
-
-// GET /items -> { items: Item[] }   (items is null when the table is empty)
-export const getItems = async (): Promise<Item[]> => {
-  const res = await request('/items', { method: 'GET' }, 'Failed to load items');
-  const body: { items: ServerItem[] | null } = await res.json();
-  return (body.items ?? []).map(fromServer);
+  const created: Tag = { ID: `tag-${nextTagId++}`, Name: name };
+  tagStore = [...tagStore, created];
+  return { ...created };
 };
 
-// GET /items/{id} -> { item: Item }
-export const getItem = async (id: string): Promise<Item> => {
-  const res = await request(`/items/${id}`, { method: 'GET' }, 'Failed to load item');
-  const body: { item: ServerItem } = await res.json();
-  return fromServer(body.item);
+// DELETE /tags/:id
+export const deleteTag = async (id: TagID): Promise<void> => {
+  await latency();
+  // const res = await fetch(`${BASE_URL}/tags/${id}`, { method: 'DELETE', credentials: 'include' });
+  // if (!res.ok) throw new Error(`Failed to delete tag (${res.status})`);
+  tagStore = tagStore.filter((t) => t.ID !== id);
+  for (const [itemId, ids] of itemTagLinks) itemTagLinks.set(itemId, ids.filter((t) => t !== id));
 };
 
-// POST /items -> 201 { item: Item }
-export const createItem = async (item: NewItem): Promise<Item> => {
-  const res = await request(
-    '/items',
-    { method: 'POST', body: JSON.stringify(item) },
-    'Failed to create item'
-  );
-  const body: { item: ServerItem } = await res.json();
-  return fromServer(body.item);
-};
-
-// PUT /items/{id} -> 200 { item: Item } (the updated item)
-export const updateItem = async (id: string, changes: UpdateItem): Promise<Item> => {
-  const res = await request(
-    `/items/${id}`,
-    { method: 'PUT', body: JSON.stringify(changes) },
-    'Failed to update item'
-  );
-  const body: { item: ServerItem } = await res.json();
-  return fromServer(body.item);
-};
-
-// The server stores an absolute quantity and works out ADDED / TAKEN / MODIFIED for the
-// changelog itself from the difference, so this reads the current quantity, applies the
-// delta, and PUTs the result. Not atomic: two people adjusting the same item at once can
-// overwrite each other.
-export const adjustItem = async (
-  id: string,
-  action: 'ADDED' | 'TAKEN',
-  amount: number,
-  note?: string
-): Promise<Item> => {
-  const current = await getItem(id);
-  if (action === 'TAKEN' && current.quantity < amount) throw new Error('Not enough in stock');
-  const quantity = current.quantity + (action === 'ADDED' ? amount : -amount);
-  return updateItem(id, { quantity, logDescription: note });
-};
-
-// DELETE /items/{id} -> 204, no body (the server logs the deletion)
-export const deleteItem = async (id: string): Promise<void> => {
-  await request(`/items/${id}`, { method: 'DELETE' }, 'Failed to delete item');
+// PUT /items/:id/tags  { tag_ids }  ->  { item }  (returns the item's full tag list after the change)
+export const setItemTags = async (itemId: string, tagIds: TagID[]): Promise<Tag[]> => {
+  await latency();
+  // const res = await fetch(`${BASE_URL}/items/${itemId}/tags`, {
+  //   method: 'PUT',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   credentials: 'include',
+  //   body: JSON.stringify({ tag_ids: tagIds }),
+  // });
+  // const body = await res.json().catch(() => ({}));
+  // if (!res.ok) throw new Error(body.error ?? `Failed to update tags (${res.status})`);
+  // return (body.item.tags ?? []).map(normalizeTag);
+  const unique = [...new Set(tagIds)];
+  if (unique.some((id) => !tagStore.some((t) => t.ID === id))) throw new Error("One or more tags don't exist");
+  itemTagLinks.set(itemId, unique);
+  return tagsForItem(itemId);
 };
