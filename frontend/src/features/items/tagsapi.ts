@@ -44,17 +44,17 @@ const SEED_TAG_NAMES = [
 let tagStore: Tag[] = SEED_TAG_NAMES.map((Name, i) => ({ ID: `tag-${i + 1}`, Name }));
 let nextTagId = tagStore.length + 1;
 // item ID -> tag IDs (matches the item_tags join table)
-const itemTagLinks = new Map<number, TagID[]>();
+const itemTagLinks = new Map<string, TagID[]>();
 const latency = () => new Promise((r) => setTimeout(r, 200));
 
 // Used by the dummy itemsapi so items come back with their tags. Not needed once the backend preloads them.
-export const tagsForItem = (itemId: number): Tag[] =>
+export const tagsForItem = (itemId: string): Tag[] =>
   (itemTagLinks.get(itemId) ?? [])
     .map((id) => tagStore.find((t) => t.ID === id))
     .filter((t): t is Tag => !!t)
     .map((t) => ({ ...t }));
 // Seeds the dummy links by tag name (used by the dummy item generator in itemsapi.ts).
-export const linkItemTags = (itemId: number, names: string[]) => {
+export const linkItemTags = (itemId: string, names: string[]) => {
   itemTagLinks.set(
     itemId,
     names
@@ -62,7 +62,7 @@ export const linkItemTags = (itemId: number, names: string[]) => {
       .filter((id): id is TagID => !!id)
   );
 };
-export const forgetItemTags = (itemId: number) => {
+export const forgetItemTags = (itemId: string) => {
   itemTagLinks.delete(itemId);
 };
 /* ---------- /DUMMY STORE ---------- */
@@ -106,7 +106,7 @@ export const deleteTag = async (id: TagID): Promise<void> => {
 };
 
 // PUT /items/:id/tags  { tag_ids }  ->  { item }  (returns the item's full tag list after the change)
-export const setItemTags = async (itemId: number, tagIds: TagID[]): Promise<Tag[]> => {
+export const setItemTags = async (itemId: string, tagIds: TagID[]): Promise<Tag[]> => {
   await latency();
   // const res = await fetch(`${BASE_URL}/items/${itemId}/tags`, {
   //   method: 'PUT',

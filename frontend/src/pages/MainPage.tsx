@@ -506,9 +506,11 @@ interface SpotlightProps {
   allTags: Tag[];
   onClose: () => void;
   onCancel: () => void;
-  onSave: (item: NewItem) => void;
+  onSave: (item: NewItem, tagIds: TagID[]) => void;
   onAdjust: (id: string, delta: number) => void;
   onDelete: (id: string) => void;
+  onSetTags: (id: string, tagIds: TagID[]) => void;
+  onCreateTag: (name: string) => Promise<Tag | null>;
 }
 
 const SpotlightPanel = ({
@@ -597,7 +599,7 @@ const SpotlightPanel = ({
             <TagEditor
               allTags={allTags}
               selectedIds={tagIdsOf(item)}
-              onChange={(ids) => onSetTags(item.ID, ids)}
+              onChange={(ids) => onSetTags(item.id, ids)}
               onCreate={onCreateTag}
             />
           </section>
@@ -707,7 +709,7 @@ export const MainPage = () => {
   };
 
   // POST /items
-  const saveNew = async (item: NewItem) => {
+  const saveNew = async (item: NewItem, tagIds: TagID[]) => {
     setSaving(true);
     setError('');
     try {
@@ -715,7 +717,7 @@ export const MainPage = () => {
       let finalItem = created;
       if (tagIds.length > 0) {
         try {
-          finalItem = { ...created, Tags: await setItemTags(created.ID, tagIds) };
+          finalItem = { ...created, Tags: await setItemTags(created.id, tagIds) };
         } catch (e) {
           fail(e); // item exists, only the tags failed; the user can retag from the spotlight
         }
@@ -735,7 +737,9 @@ export const MainPage = () => {
     setError('');
     try {
       const updated = await adjustItem(id, delta > 0 ? 'ADDED' : 'TAKEN', Math.abs(delta));
-      setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, ...updated, Tags: updated.Tags ?? i.Tags } : i))
+      );
     } catch (e) {
       fail(e);
     }
@@ -787,11 +791,11 @@ export const MainPage = () => {
   };
 
   // PUT /items/:id/tags
-  const updateItemTags = async (id: number, tagIds: TagID[]) => {
+  const updateItemTags = async (id: string, tagIds: TagID[]) => {
     setError('');
     try {
       const newTags = await setItemTags(id, tagIds);
-      setItems((prev) => prev.map((i) => (i.ID === id ? { ...i, Tags: newTags } : i)));
+      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, Tags: newTags } : i)));
     } catch (e) {
       fail(e);
     }
@@ -809,12 +813,17 @@ export const MainPage = () => {
   // Selected tags narrow the list: an item must have all of them.
   const visibleItems = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (item) =>
-        item.itemName.toLowerCase().includes(q) || item.manufacturerPart.toLowerCase().includes(q)
-    );
-  }, [items, query]);
+    return items.filter((item) => {
+      const ids = tagIdsOf(item);
+      if (!activeTagIds.every((id) => ids.includes(id))) return false;
+      if (!q) return true;
+      return (
+        item.itemName.toLowerCase().includes(q) ||
+        item.manufacturerPart.toLowerCase().includes(q) ||
+        (item.Tags ?? []).some((t) => t.Name.toLowerCase().includes(q))
+      );
+    });
+  }, [items, query, activeTagIds]);
 
   const rows = draft ? [draft as TaggedItem, ...visibleItems] : visibleItems;
   const filtering = query.trim() !== '' || activeTagIds.length > 0;
@@ -921,6 +930,7 @@ export const MainPage = () => {
             <ul className="divide-y divide-slate-800/80">
               {rows.map((item) => {
                 const stock = getStock(item);
+                const itemTags = item.Tags ?? [];
                 const isSelected = item.id === selectedId;
                 const isDraft = item.id === DRAFT_ID;
                 const subtitle = [item.manufacturerPart, item.distributorPart].filter(Boolean).join(' · ');
