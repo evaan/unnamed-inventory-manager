@@ -13,7 +13,7 @@ type Item struct {
 	Quantity         int32          `gorm:"type:integer;not null"`
 	Manufacturer     string         `gorm:"not null"`
 	ManufacturerPart string         `gorm:"not null"`
-	Category         []ItemCategory `gorm:"many2many:ItemCategoryLinks;"`
+	Categories       []ItemCategory `gorm:"many2many:ItemCategoryLinks;"`
 	DistributorPart  string         // Digikey or McMaster part number
 	DistributorURL   string
 	DataSheetURL     string
@@ -43,15 +43,16 @@ const (
 )
 
 type UpdateItemReq struct {
-	ItemName         *string `json:"itemName"`
-	Quantity         *int32  `json:"quantity"`
-	Manufacturer     *string `json:"manufacturer"`
-	ManufacturerPart *string `json:"manufacturerPart"`
-	DistributorPart  *string `json:"distributorPart"`
-	DistributorURL   *string `json:"distributorURL"`
-	ItemDescription  *string `json:"itemDescription"`
-	DataSheetURL     *string `json:"dataSheetURL"`
-	LogDescription   *string `json:"logDescription"`
+	ItemName         *string      `json:"itemName"`
+	Quantity         *int32       `json:"quantity"`
+	Manufacturer     *string      `json:"manufacturer"`
+	ManufacturerPart *string      `json:"manufacturerPart"`
+	Categories       *[]uuid.UUID `json:"categoryIDs"`
+	DistributorPart  *string      `json:"distributorPart"`
+	DistributorURL   *string      `json:"distributorURL"`
+	ItemDescription  *string      `json:"itemDescription"`
+	DataSheetURL     *string      `json:"dataSheetURL"`
+	LogDescription   *string      `json:"logDescription"`
 }
 
 type CreateItemReq struct {
