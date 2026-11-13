@@ -72,11 +72,45 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 	}
 
 	newItem := createNewItem(req)
-	if len(newItem) == 0 {
+	if len(newItem) == 0 && req.Categories == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "No item fields provided for update",
 		})
 		return
+	}
+
+	if req.Categories != nil {
+
+		var categories []ItemCategory
+
+		if err := db.Where("id IN ?", *req.Categories).Find(&categories).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Error retrieving categories for items",
+			})
+			return
+		}
+
+		databaseIDS := make(map[uuid.UUID]bool)
+
+		for _, category := range categories {
+			databaseIDS[category.ID] = true
+		}
+
+		for _, reqID := range *req.Categories {
+			if !databaseIDS[reqID] {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": "Adding tag that wasn't found in the database",
+				})
+				return
+			}
+		}
+
+		if err := db.Model(&item).Association("Categories").Replace(categories); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Error updating the items tag",
+			})
+			return
+		}
 	}
 
 	if req.Quantity == nil {
