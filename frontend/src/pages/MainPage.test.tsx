@@ -1,9 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { MainPage } from './MainPage';
 import { useAuth, useLogout } from '../features/auth/useAuth';
 import { getItems, createItem, adjustItem, deleteItem, type Item } from '../features/items/itemsapi';
+import { getTags } from '../features/items/tagsapi';
 
 // Mock both feature modules so tests never touch the network or the other teams' services.
 vi.mock('../features/auth/useAuth', () => ({
@@ -15,6 +17,12 @@ vi.mock('../features/items/itemsapi', () => ({
   createItem: vi.fn(),
   adjustItem: vi.fn(),
   deleteItem: vi.fn(),
+}));
+vi.mock('../features/items/tagsapi', () => ({
+  getTags: vi.fn(),
+  createTag: vi.fn(),
+  deleteTag: vi.fn(),
+  setItemTags: vi.fn(),
 }));
 
 const makeItem = (overrides: Partial<Item> = {}): Item => ({
@@ -38,9 +46,17 @@ const ITEMS = [
 
 const logoutMutate = vi.fn();
 
+// MainPage uses useNavigate (Bookings button), so it needs a router around it.
+const renderMain = () =>
+  render(
+    <MemoryRouter>
+      <MainPage />
+    </MemoryRouter>
+  );
+
 const renderPage = async (items = ITEMS) => {
   vi.mocked(getItems).mockResolvedValue(items);
-  render(<MainPage />);
+  renderMain();
   await waitFor(() => expect(screen.queryByText(/loading items/i)).not.toBeInTheDocument());
 };
 
@@ -48,20 +64,21 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(useAuth).mockReturnValue({ data: { loggedIn: true, disabled: false } } as never);
   vi.mocked(useLogout).mockReturnValue({ mutate: logoutMutate, isPending: false } as never);
+  vi.mocked(getTags).mockResolvedValue([]); // resetAllMocks clears this, so set it every time
 });
 
 describe('MainPage: auth gate', () => {
   it('renders nothing when the user is not logged in', () => {
     vi.mocked(useAuth).mockReturnValue({ data: { loggedIn: false } } as never);
     vi.mocked(getItems).mockResolvedValue([]);
-    const { container } = render(<MainPage />);
+    const { container } = renderMain();
     expect(container).toBeEmptyDOMElement();
   });
 
   it('renders nothing when the account is disabled', () => {
     vi.mocked(useAuth).mockReturnValue({ data: { loggedIn: true, disabled: true } } as never);
     vi.mocked(getItems).mockResolvedValue([]);
-    const { container } = render(<MainPage />);
+    const { container } = renderMain();
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -81,7 +98,7 @@ describe('MainPage: auth gate', () => {
 describe('MainPage: loading and listing', () => {
   it('shows a loading message, then the items', async () => {
     vi.mocked(getItems).mockResolvedValue(ITEMS);
-    render(<MainPage />);
+    renderMain();
     expect(screen.getByText(/loading items/i)).toBeInTheDocument();
     expect(await screen.findByText('Resistor 4.7k')).toBeInTheDocument();
     expect(screen.getByText('Capacitor 10uF')).toBeInTheDocument();
@@ -112,7 +129,7 @@ describe('MainPage: loading and listing', () => {
 
   it('shows an error banner when loading fails, and it can be dismissed', async () => {
     vi.mocked(getItems).mockRejectedValue(new Error('Network down'));
-    render(<MainPage />);
+    renderMain();
     expect(await screen.findByText('Network down')).toBeInTheDocument();
 
     await userEvent.click(screen.getByTitle('Dismiss'));
@@ -123,7 +140,7 @@ describe('MainPage: loading and listing', () => {
 describe('MainPage: search', () => {
   it('filters by item name (case-insensitive)', async () => {
     await renderPage();
-    await userEvent.type(screen.getByPlaceholderText(/search name or part number/i), 'LED');
+    await userEvent.type(screen.getByPlaceholderText(/search name, part number/i), 'LED');
     expect(screen.getByText('LED Red')).toBeInTheDocument();
     expect(screen.queryByText('Resistor 4.7k')).not.toBeInTheDocument();
     expect(screen.getByText('1 of 3')).toBeInTheDocument();
@@ -131,15 +148,15 @@ describe('MainPage: search', () => {
 
   it('filters by manufacturer part number', async () => {
     await renderPage();
-    await userEvent.type(screen.getByPlaceholderText(/search name or part number/i), 'cap-10u');
+    await userEvent.type(screen.getByPlaceholderText(/search name, part number/i), 'cap-10u');
     expect(screen.getByText('Capacitor 10uF')).toBeInTheDocument();
     expect(screen.queryByText('LED Red')).not.toBeInTheDocument();
   });
 
   it('shows a no-match message and "Clear search" restores the list', async () => {
     await renderPage();
-    await userEvent.type(screen.getByPlaceholderText(/search name or part number/i), 'zzzz');
-    expect(screen.getByText('No items match your search.')).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText(/search name, part number/i), 'zzzz');
+    expect(screen.getByText('No items match your filters.')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /clear search/i }));
     expect(screen.getByText('Resistor 4.7k')).toBeInTheDocument();
