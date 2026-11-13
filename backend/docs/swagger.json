@@ -11,7 +11,7 @@
     "paths": {
         "/callback": {
             "get": {
-                "description": "Checks the oauth_state cookie, starts a session and sends you back to the frontend",
+                "description": "Checks the oauth_state cookie, verifies the Google identity and email, starts a session and sends you back to the frontend.\nNew users follow signup_policy: open enables them, whitelist enables exact whitelisted email domain matches, and closed creates them disabled for approval.\nA matching non-empty ADMIN_EMAIL bypasses signup restrictions for new users. Existing users keep their disabled status",
                 "tags": [
                     "Auth"
                 ],
@@ -56,7 +56,7 @@
                         "description": "User details already in use"
                     },
                     "500": {
-                        "description": "Error logging in"
+                        "description": "Error logging in or invalid signup settings"
                     }
                 }
             }
@@ -445,6 +445,202 @@
                 }
             }
         },
+        "/settings": {
+            "get": {
+                "description": "Get all setting names and their string values. Lists are stored as JSON-encoded strings. Admin only, using the session cookie",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Get settings",
+                "responses": {
+                    "200": {
+                        "description": "Application settings",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Not an administrator or user disabled"
+                    },
+                    "500": {
+                        "description": "Error getting settings"
+                    }
+                }
+            },
+            "patch": {
+                "description": "Update existing settings by name. Values must be strings; encode lists as JSON strings. Omitted settings are unchanged.\nAll updates are applied together, and unknown names are rejected. Admin only, using the session cookie",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Update settings",
+                "parameters": [
+                    {
+                        "description": "Setting names mapped to string values",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/settings.PatchSettingsRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Frontend origin, required if Referer is not set",
+                        "name": "Origin",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Settings updated"
+                    },
+                    "400": {
+                        "description": "Invalid request body, non-string value, or no settings provided"
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Not an administrator, user disabled, or invalid frontend Origin or Referer"
+                    },
+                    "404": {
+                        "description": "Setting not found"
+                    },
+                    "500": {
+                        "description": "Error updating settings"
+                    }
+                }
+            }
+        },
+        "/user/{id}": {
+            "get": {
+                "description": "Get a user's ID, name, email, disabled status and permissions. Admin only, using the session cookie",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Get a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User details",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "disabled": {
+                                    "type": "boolean"
+                                },
+                                "email": {
+                                    "type": "string"
+                                },
+                                "id": {
+                                    "type": "string"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "permissions": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid user ID"
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Not an administrator or user disabled"
+                    },
+                    "404": {
+                        "description": "User not found"
+                    },
+                    "500": {
+                        "description": "Error getting user"
+                    }
+                }
+            }
+        },
+        "/users": {
+            "get": {
+                "description": "Get each user's ID, name, email, disabled status and permissions, ordered by email. Admin only, using the session cookie",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Get all users",
+                "responses": {
+                    "200": {
+                        "description": "User details",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "disabled": {
+                                        "type": "boolean"
+                                    },
+                                    "email": {
+                                        "type": "string"
+                                    },
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "permissions": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Not an administrator or user disabled"
+                    },
+                    "500": {
+                        "description": "Error getting users"
+                    }
+                }
+            }
+        },
         "/users/{id}": {
             "patch": {
                 "description": "Disable or enable a user. Admin only, using the session cookie",
@@ -640,6 +836,12 @@
                 "quantity": {
                     "type": "integer"
                 }
+            }
+        },
+        "settings.PatchSettingsRequest": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "string"
             }
         }
     }

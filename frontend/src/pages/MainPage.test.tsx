@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MainPage } from './MainPage';
 import { useAuth, useLogout } from '../features/auth/useAuth';
-import { getItems, createItem, adjustItem, deleteItem } from '../features/items/itemsapi';
+import { getItems, createItem, adjustItem, deleteItem, type Item } from '../features/items/itemsapi';
 
 // Mock both feature modules so tests never touch the network or the other teams' services.
 vi.mock('../features/auth/useAuth', () => ({
@@ -17,23 +17,23 @@ vi.mock('../features/items/itemsapi', () => ({
   deleteItem: vi.fn(),
 }));
 
-const makeItem = (overrides = {}) => ({
-  ID: 1,
-  ItemName: 'Resistor 4.7k',
-  Quantity: 50,
-  Manufacturer: 'Yageo',
-  ManufacturerPart: 'RC0805-4K7',
-  DistributorPart: 'DK-4K7',
-  DistributorURL: 'https://dist.example/4k7',
-  DataSheetURL: 'https://ds.example/4k7.pdf',
-  Description: 'Thick film resistor',
+const makeItem = (overrides: Partial<Item> = {}): Item => ({
+  id: '1',
+  itemName: 'Resistor 4.7k',
+  quantity: 50,
+  manufacturer: 'Yageo',
+  manufacturerPart: 'RC0805-4K7',
+  distributorPart: 'DK-4K7',
+  distributorURL: 'https://dist.example/4k7',
+  dataSheetURL: 'https://ds.example/4k7.pdf',
+  description: 'Thick film resistor',
   ...overrides,
 });
 
 const ITEMS = [
-  makeItem({ ID: 1, ItemName: 'Resistor 4.7k', Quantity: 50, ManufacturerPart: 'RC0805-4K7' }),
-  makeItem({ ID: 2, ItemName: 'Capacitor 10uF', Quantity: 5, ManufacturerPart: 'CAP-10U' }),
-  makeItem({ ID: 3, ItemName: 'LED Red', Quantity: 0, ManufacturerPart: 'LED-R' }),
+  makeItem({ id: '1', itemName: 'Resistor 4.7k', quantity: 50, manufacturerPart: 'RC0805-4K7' }),
+  makeItem({ id: '2', itemName: 'Capacitor 10uF', quantity: 5, manufacturerPart: 'CAP-10U' }),
+  makeItem({ id: '3', itemName: 'LED Red', quantity: 0, manufacturerPart: 'LED-R' }),
 ];
 
 const logoutMutate = vi.fn();
@@ -98,8 +98,8 @@ describe('MainPage: loading and listing', () => {
 
   it('treats exactly 10 as low stock and 11 as in stock', async () => {
     await renderPage([
-      makeItem({ ID: 1, ItemName: 'Ten', Quantity: 10 }),
-      makeItem({ ID: 2, ItemName: 'Eleven', Quantity: 11 }),
+      makeItem({ id: '1', itemName: 'Ten', quantity: 10 }),
+      makeItem({ id: '2', itemName: 'Eleven', quantity: 11 }),
     ]);
     expect(screen.getByText('Low stock')).toBeInTheDocument();
     expect(screen.getByText('In stock')).toBeInTheDocument();
@@ -190,22 +190,22 @@ describe('MainPage: spotlight panel', () => {
 
 describe('MainPage: adjust quantity', () => {
   it('sends ADDED with the amount when +1 is clicked and updates the item', async () => {
-    vi.mocked(adjustItem).mockResolvedValue(makeItem({ ID: 2, ItemName: 'Capacitor 10uF', Quantity: 6 }));
+    vi.mocked(adjustItem).mockResolvedValue(makeItem({ id: '2', itemName: 'Capacitor 10uF', quantity: 6 }));
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /capacitor 10uf/i }));
     await userEvent.click(screen.getByRole('button', { name: '+1' }));
 
-    expect(adjustItem).toHaveBeenCalledWith(2, 'ADDED', 1);
+    expect(adjustItem).toHaveBeenCalledWith('2', 'ADDED', 1);
     expect(await screen.findByText('6')).toBeInTheDocument();
   });
 
   it('sends TAKEN with a positive amount when -1 is clicked', async () => {
-    vi.mocked(adjustItem).mockResolvedValue(makeItem({ ID: 1, Quantity: 49 }));
+    vi.mocked(adjustItem).mockResolvedValue(makeItem({ id: '1', quantity: 49 }));
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
     await userEvent.click(screen.getByRole('button', { name: '-1' }));
 
-    expect(adjustItem).toHaveBeenCalledWith(1, 'TAKEN', 1);
+    expect(adjustItem).toHaveBeenCalledWith('1', 'TAKEN', 1);
   });
 
   it('disables decrement buttons that would take quantity below zero', async () => {
@@ -233,7 +233,7 @@ describe('MainPage: delete', () => {
     await userEvent.click(screen.getByRole('button', { name: /led red/i }));
     await userEvent.click(screen.getByTitle('Delete item'));
 
-    expect(deleteItem).toHaveBeenCalledWith(3);
+    expect(deleteItem).toHaveBeenCalledWith('3');
     await waitFor(() => expect(screen.queryByText('LED Red')).not.toBeInTheDocument());
     expect(screen.getByText('2 of 2')).toBeInTheDocument();
   });
@@ -275,7 +275,7 @@ describe('MainPage: new item', () => {
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
     await userEvent.click(screen.getByRole('button', { name: /add item/i }));
 
-    expect(screen.getByText('Add a name before saving.')).toBeInTheDocument();
+    expect(screen.getByText('Name, manufacturer and manufacturer part # are required.')).toBeInTheDocument();
     expect(createItem).not.toHaveBeenCalled();
   });
 
@@ -284,11 +284,11 @@ describe('MainPage: new item', () => {
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
     await userEvent.click(screen.getByRole('button', { name: /add item/i }));
     await userEvent.type(screen.getByLabelText('Name'), 'x');
-    expect(screen.queryByText('Add a name before saving.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Name, manufacturer and manufacturer part # are required.')).not.toBeInTheDocument();
   });
 
   it('saves trimmed values with a sanitised integer quantity, then lists the new item', async () => {
-    vi.mocked(createItem).mockImplementation(async (item) => ({ ...item, ID: 99 }) as never);
+    vi.mocked(createItem).mockImplementation(async (item) => makeItem({ ...item, id: '99' }));
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
 
@@ -296,10 +296,11 @@ describe('MainPage: new item', () => {
     await userEvent.clear(screen.getByLabelText('Quantity'));
     await userEvent.type(screen.getByLabelText('Quantity'), '12.7');
     await userEvent.type(screen.getByLabelText('Manufacturer'), ' TDK ');
+    await userEvent.type(screen.getByLabelText('Manufacturer Part #'), ' TDK-12 ');
     await userEvent.click(screen.getByRole('button', { name: /add item/i }));
 
     expect(createItem).toHaveBeenCalledWith(
-      expect.objectContaining({ ItemName: 'Inductor', Quantity: 12, Manufacturer: 'TDK' })
+      expect.objectContaining({ itemName: 'Inductor', quantity: 12, manufacturer: 'TDK', manufacturerPart: 'TDK-12' })
     );
     expect(await screen.findByRole('heading', { name: 'Inductor' })).toBeInTheDocument();
     expect(screen.queryByText('Draft')).not.toBeInTheDocument();
@@ -307,15 +308,17 @@ describe('MainPage: new item', () => {
   });
 
   it('clamps negative or non-numeric quantities to 0', async () => {
-    vi.mocked(createItem).mockImplementation(async (item) => ({ ...item, ID: 99 }) as never);
+    vi.mocked(createItem).mockImplementation(async (item) => makeItem({ ...item, id: '99' }));
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
     await userEvent.type(screen.getByLabelText('Name'), 'Widget');
+    await userEvent.type(screen.getByLabelText('Manufacturer'), 'TDK');
+    await userEvent.type(screen.getByLabelText('Manufacturer Part #'), 'TDK-12');
     await userEvent.clear(screen.getByLabelText('Quantity'));
     await userEvent.type(screen.getByLabelText('Quantity'), '-5');
     await userEvent.click(screen.getByRole('button', { name: /add item/i }));
 
-    expect(createItem).toHaveBeenCalledWith(expect.objectContaining({ Quantity: 0 }));
+    expect(createItem).toHaveBeenCalledWith(expect.objectContaining({ quantity: 0 }));
   });
 
   it('discards the draft with Cancel', async () => {
@@ -339,6 +342,8 @@ describe('MainPage: new item', () => {
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
     await userEvent.type(screen.getByLabelText('Name'), 'Widget');
+    await userEvent.type(screen.getByLabelText('Manufacturer'), 'TDK');
+    await userEvent.type(screen.getByLabelText('Manufacturer Part #'), 'TDK-12');
     await userEvent.click(screen.getByRole('button', { name: /add item/i }));
 
     expect(await screen.findByText('Create failed')).toBeInTheDocument();

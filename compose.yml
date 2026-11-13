@@ -1,18 +1,33 @@
+name: inventory
+
 services:
+  traefik:
+    image: traefik:v3
+    restart: always
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.constraints=Label(`com.docker.compose.project`, `inventory`)
+      - --entrypoints.web.address=:80
+    ports:
+      - "8980:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
   frontend:
-    container_name: frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
     restart: always
-    ports:
-      - "8080:8080"
-    environment:
-      VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      VITE_API_URL: http://localhost:8081
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.frontend.rule: Host(`inventory.evaan.dev`)
+      traefik.http.routers.frontend.entrypoints: web
+      traefik.http.services.frontend.loadbalancer.server.port: "8080"
 
   backend:
-    container_name: backend
     restart: always
     build:
       context: ./backend
@@ -20,26 +35,33 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "8081:8080"
     environment:
+      GIN_MODE: release
       POSTGRES_URL: postgresql://admin:admin@postgres:5432/inventory?sslmode=disable
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_REDIRECT_URL: http://localhost:8081/callback
-      FRONTEND_URL: http://localhost:8080
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in .env}
+      GOOGLE_REDIRECT_URL: https://inventory.evaan.dev/api/callback
+      FRONTEND_URL: https://inventory.evaan.dev/app
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.backend.rule: Host(`inventory.evaan.dev`) && (Path(`/api`) || PathPrefix(`/api/`))
+      traefik.http.routers.backend.entrypoints: web
+      traefik.http.routers.backend.middlewares: api-strip-prefix
+      traefik.http.middlewares.api-strip-prefix.stripprefix.prefixes: /api
+      traefik.http.services.backend.loadbalancer.server.port: "8080"
 
   postgres:
-      image: postgres:alpine
-      restart: always
-      environment:
-        POSTGRES_USER: admin
-        POSTGRES_PASSWORD: admin
-        POSTGRES_DB: inventory
-      volumes:
-        - ./postgres-data:/var/lib/postgresql
-      healthcheck:
-        test: ["CMD-SHELL", "pg_isready -U admin -d inventory"]
-        interval: 5s
-        timeout: 5s
-        retries: 5
+    image: postgres:alpine
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: inventory
+    volumes:
+      - ./postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d inventory"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
