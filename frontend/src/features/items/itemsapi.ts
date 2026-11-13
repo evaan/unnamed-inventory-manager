@@ -6,6 +6,8 @@
 //   - responses use PascalCase, because the Go `Item` struct has no json tags
 // The app uses camelCase everywhere, so responses are converted in `fromServer` below.
 
+import type { Tag } from './tagsapi';
+
 const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/+$/, '');
 
 // Shape of an item as the server returns it.
@@ -19,6 +21,9 @@ interface ServerItem {
   DistributorURL: string;
   DataSheetURL: string;
   Description: string;
+  // Filled in by the API. Change tags with setItemTags in tagsapi.ts.
+  // Live: map the backend's `tags` array with normalizeTag from tagsapi.ts.
+  Tags?: Tag[];
 }
 
 // Item as the app uses it. Optional text fields come back as '' when unset.
@@ -32,6 +37,8 @@ export interface Item {
   distributorURL: string;
   dataSheetURL: string;
   description: string;
+  // Tags on the item. Undefined if the server didn't include them. Change with setItemTags in tagsapi.ts.
+  Tags?: Tag[];
 }
 
 const fromServer = (s: ServerItem): Item => ({
@@ -44,6 +51,7 @@ const fromServer = (s: ServerItem): Item => ({
   distributorURL: s.DistributorURL,
   dataSheetURL: s.DataSheetURL,
   description: s.Description,
+  Tags: s.Tags,
 });
 
 // POST /items body (CreateItemReq). The server requires itemName, manufacturer and

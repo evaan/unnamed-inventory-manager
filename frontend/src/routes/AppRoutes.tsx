@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from '../pages/LoginPage';
 import { MainPage } from '../pages/MainPage';
 import { AccountPage } from '../pages/AccountPage';
-import { SettingsPage } from '../pages/SettingsPage';
+import { BookingsPage } from '../pages/BookingsPage';
 import { DisabledPage } from '../pages/DisabledPage';
 import AppLayout from '../layout/AppLayout';
 import { useAuth } from '../features/auth/useAuth';
@@ -52,7 +52,7 @@ function SessionRoutes() {
       >
         <Route index element={<MainPage />} />
         <Route path="account" element={<AccountPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path="bookings" element={<BookingsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to={destination} replace />} />

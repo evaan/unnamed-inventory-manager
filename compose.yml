@@ -23,7 +23,7 @@ services:
     restart: always
     labels:
       traefik.enable: "true"
-      traefik.http.routers.frontend.rule: Host(`inventory.evaan.dev`)
+      traefik.http.routers.frontend.rule: Host(`inventory.evaan.dev`) || Host(`localhost`)
       traefik.http.routers.frontend.entrypoints: web
       traefik.http.services.frontend.loadbalancer.server.port: "8080"
 
@@ -40,13 +40,14 @@ services:
       POSTGRES_URL: postgresql://admin:admin@postgres:5432/inventory?sslmode=disable
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in .env}
-      GOOGLE_REDIRECT_URL: https://inventory.evaan.dev/api/callback
-      FRONTEND_URL: https://inventory.evaan.dev/app
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-https://inventory.evaan.dev/api/callback}
+      FRONTEND_URL: ${FRONTEND_URL:-https://inventory.evaan.dev/app}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
     labels:
       traefik.enable: "true"
-      traefik.http.routers.backend.rule: Host(`inventory.evaan.dev`) && (Path(`/api`) || PathPrefix(`/api/`))
+      traefik.http.routers.backend.rule: (Host(`inventory.evaan.dev`) || Host(`localhost`)) && (Path(`/api`) || PathPrefix(`/api/`))
       traefik.http.routers.backend.entrypoints: web
+      traefik.http.routers.backend.priority: "100"
       traefik.http.routers.backend.middlewares: api-strip-prefix
       traefik.http.middlewares.api-strip-prefix.stripprefix.prefixes: /api
       traefik.http.services.backend.loadbalancer.server.port: "8080"
