@@ -8,6 +8,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// @Summary		Add item category
+// @Description	Adds a category for items to the inventory manager
+// @Tags			Category
+// @Accept			json
+// @Param			body	body	CreateItemCategoryReq	true	"Category information (categoryName, parentID)"
+// @Success		201		"Item category created"
+// @Failure		400		"Invalid request body"
+// @Failure		500		"Error creating category"
+// @Router			/categories [post]
 func CreateCategory(c *gin.Context, db *gorm.DB) {
 
 	var req CreateItemCategoryReq
