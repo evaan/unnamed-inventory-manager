@@ -22,6 +22,7 @@ func GetCategories(c *gin.Context, db *gorm.DB) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Error retrieving item categories",
 		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
