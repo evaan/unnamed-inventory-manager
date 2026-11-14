@@ -260,3 +260,37 @@ func TestRemoveItem(t *testing.T) {
 		t.Fatalf("Removed item still found within database: %v", err)
 	}
 }
+
+func TestAddCategory(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
+
+	body := `{
+		"categoryName": "TestCategory1"
+	}`
+
+	response := makeRequest(router, http.MethodPost, "/categories", body, adminToken)
+
+	// Ensure HTTP response is correct
+	requireStatus(t, response, http.StatusCreated)
+
+	var result struct {
+		ItemCategory inventory.ItemCategory `json:"itemCategory"`
+	}
+
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatalf("Can't decode category created: %v", err)
+	}
+
+	var addedItemCategory inventory.ItemCategory
+
+	// Ensure category was successfully added to the database
+	if err := db.First(&addedItemCategory, "id = ?", result.ItemCategory.ID).Error; err != nil {
+		t.Fatalf("Created item wasn't found in the database: %v", err)
+	}
+
+	// Ensure the name matches
+	if addedItemCategory.CategoryName != "TestCategory1" {
+		t.Errorf("Expected Name: TestCategory1 | Actual Value: %q", addedItemCategory.CategoryName)
+	}
+}
