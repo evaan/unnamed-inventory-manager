@@ -56,15 +56,16 @@ type UpdateItemReq struct {
 }
 
 type CreateItemReq struct {
-	ItemName         string `json:"itemName" binding:"required"`
-	Quantity         *int32 `json:"quantity" binding:"required"`
-	Manufacturer     string `json:"manufacturer" binding:"required"`
-	ManufacturerPart string `json:"manufacturerPart" binding:"required"`
-	DistributorPart  string `json:"distributorPart"`
-	DistributorURL   string `json:"distributorURL"`
-	DataSheetURL     string `json:"dataSheetURL"`
-	Description      string `json:"description"`
-	LogDescription   string `json:"logDescription"`
+	ItemName         string       `json:"itemName" binding:"required"`
+	Quantity         *int32       `json:"quantity" binding:"required"`
+	Manufacturer     string       `json:"manufacturer" binding:"required"`
+	ManufacturerPart string       `json:"manufacturerPart" binding:"required"`
+	Categories       *[]uuid.UUID `json:"categoryIDs"`
+	DistributorPart  string       `json:"distributorPart"`
+	DistributorURL   string       `json:"distributorURL"`
+	DataSheetURL     string       `json:"dataSheetURL"`
+	Description      string       `json:"description"`
+	LogDescription   string       `json:"logDescription"`
 }
 
 type ItemDTO struct {
