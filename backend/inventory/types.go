@@ -47,7 +47,7 @@ type UpdateItemReq struct {
 	Quantity         *int32       `json:"quantity"`
 	Manufacturer     *string      `json:"manufacturer"`
 	ManufacturerPart *string      `json:"manufacturerPart"`
-	Categories       *[]uuid.UUID `json:"categoryIDs"`
+	Categories       *[]uuid.UUID `json:"categories"`
 	DistributorPart  *string      `json:"distributorPart"`
 	DistributorURL   *string      `json:"distributorURL"`
 	ItemDescription  *string      `json:"itemDescription"`
@@ -60,7 +60,7 @@ type CreateItemReq struct {
 	Quantity         *int32       `json:"quantity" binding:"required"`
 	Manufacturer     string       `json:"manufacturer" binding:"required"`
 	ManufacturerPart string       `json:"manufacturerPart" binding:"required"`
-	Categories       *[]uuid.UUID `json:"categoryIDs"`
+	Categories       *[]uuid.UUID `json:"categories"`
 	DistributorPart  string       `json:"distributorPart"`
 	DistributorURL   string       `json:"distributorURL"`
 	DataSheetURL     string       `json:"dataSheetURL"`
