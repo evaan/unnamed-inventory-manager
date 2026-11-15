@@ -294,3 +294,116 @@ func TestAddCategory(t *testing.T) {
 		t.Errorf("Expected Name: TestCategory1 | Actual Value: %q", addedItemCategory.CategoryName)
 	}
 }
+
+func TestAddSubCategory(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
+
+	testParentCategory := inventory.ItemCategory{
+		ID:           uuid.New(),
+		CategoryName: "TestParentCategory",
+	}
+
+	if err := db.Create(&testParentCategory).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	body := `{
+		"categoryName": "TestSubCategory1",
+		"parentID": "` + testParentCategory.ID.String() + `"
+	}`
+
+	response := makeRequest(router, http.MethodPost, "/categories", body, adminToken)
+
+	// Ensure HTTP response is correct
+	requireStatus(t, response, http.StatusCreated)
+
+	var result struct {
+		ItemCategory inventory.ItemCategory `json:"itemCategory"`
+	}
+
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatalf("Can't decode category created: %v", err)
+	}
+
+	var addedSubCategory inventory.ItemCategory
+
+	// Ensure category was successfully added to the database
+	if err := db.Preload("ParentCategory").First(&addedSubCategory, "id = ?", result.ItemCategory.ID).Error; err != nil {
+		t.Fatalf("Created item wasn't found in the database: %v", err)
+	}
+
+	// Ensure the name matches
+	if addedSubCategory.CategoryName != "TestSubCategory1" {
+		t.Errorf("Expected Name: TestSubCategory1 | Actual Value: %q", addedSubCategory.CategoryName)
+	}
+
+	var retrievedParent = *addedSubCategory.ParentCategory
+
+	if retrievedParent.CategoryName != "TestParentCategory" {
+		t.Errorf("Expected Name: TestParentCategory | Actual Value: %q", retrievedParent.CategoryName)
+	}
+}
+
+func TestAddItemWithCategory(t *testing.T) {
+
+	router, db := newAuthRouter(t)
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
+
+	testCategory1 := inventory.ItemCategory{
+		ID:           uuid.New(),
+		CategoryName: "testCategory1",
+	}
+
+	if err := db.Create(&testCategory1).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	testCategory2 := inventory.ItemCategory{
+		ID:           uuid.New(),
+		CategoryName: "testCategory2",
+	}
+
+	if err := db.Create(&testCategory2).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	body := `{
+		"itemName": "TestItem1",
+		"quantity": 1,
+		"manufacturer": "TestCompany",
+		"manufacturerPart": "A1",
+		"categories": [
+			"` + testCategory1.ID.String() + `", 
+			"` + testCategory2.ID.String() + `"
+		],
+		"description": "This is a test item"
+	}`
+
+	response := makeRequest(router, http.MethodPost, "/items", body, adminToken)
+
+	// Ensure HTTP response is correct
+	requireStatus(t, response, http.StatusCreated)
+
+	var result struct {
+		Item inventory.Item `json:"item"`
+	}
+
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatalf("Can't decode item created: %v", err)
+	}
+
+	var addedItem inventory.Item
+
+	// Ensure Item was successfully added to the database
+	if err := db.Preload("Categories").First(&addedItem, "id = ?", result.Item.ID).Error; err != nil {
+		t.Fatalf("Created item wasn't found in the database: %v", err)
+	}
+	// Ensure the categories are correct
+	if addedItem.Categories[1].CategoryName != "testCategory1" {
+		t.Errorf("Expected Name: testCategory1 | Actual Value: %q", addedItem.Categories[1].CategoryName)
+	}
+	if addedItem.Categories[0].CategoryName != "testCategory2" {
+		t.Errorf("Expected Name: testCategory1 | Actual Value: %q", addedItem.Categories[0].CategoryName)
+	}
+}
