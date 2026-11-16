@@ -2,10 +2,13 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
-export const Modal = ({ title, children, onClose }: {
+export const Modal = ({ title, children, onClose, role = 'dialog', describedBy, compact = false }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  role?: 'dialog' | 'alertdialog';
+  describedBy?: string;
+  compact?: boolean;
 }) => {
   const titleId = useId();
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -24,15 +27,17 @@ export const Modal = ({ title, children, onClose }: {
       element.setAttribute('aria-hidden', 'true');
     });
     document.body.style.overflow = 'hidden';
-    panelRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    (panelRef.current?.querySelector<HTMLElement>('[data-modal-focus]') ?? panelRef.current?.querySelector<HTMLButtonElement>('button'))?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (overlayRef.current?.inert) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         closeRef.current();
       }
       if (event.key !== 'Tab' || !panelRef.current) return;
+      event.stopPropagation();
       const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>(
         'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       )).filter((element) => !element.matches(':disabled') && !element.hidden);
@@ -49,9 +54,9 @@ export const Modal = ({ title, children, onClose }: {
         first.focus();
       }
     };
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, true);
     return () => {
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onKeyDown, true);
       document.body.style.overflow = previousOverflow;
       siblings.forEach(({ element, inert, hidden }) => {
         element.inert = inert;
@@ -70,11 +75,12 @@ export const Modal = ({ title, children, onClose }: {
     >
       <div
         ref={panelRef}
-        role="dialog"
+        role={role}
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={describedBy}
         tabIndex={-1}
-        className="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 font-sans text-slate-100 shadow-2xl"
+        className={`max-h-[calc(100dvh-2rem)] w-full ${compact ? 'max-w-md' : 'max-w-2xl'} overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 font-sans text-slate-100 shadow-2xl`}
       >
         <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-5 py-4">
           <h2 id={titleId} className="text-base font-semibold">{title}</h2>

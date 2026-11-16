@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { PageHeader } from './PageHeader';
 
-export const Workspace = ({ children, onBeforeLeave }: { children: ReactNode; onBeforeLeave?: () => boolean }) => (
+export const Workspace = ({ children, onBeforeLeave }: { children: ReactNode; onBeforeLeave?: () => boolean | Promise<boolean> }) => (
   <div className="flex h-dvh flex-col overflow-hidden bg-slate-950">
     <PageHeader onBeforeLogout={onBeforeLeave} />
     <div className="relative flex min-h-0 flex-1 overflow-hidden">{children}</div>

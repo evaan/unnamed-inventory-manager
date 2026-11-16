@@ -1,4 +1,4 @@
-import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes, useMatch } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { hasPermission } from '../features/auth/auth';
 import { useAuth } from '../features/auth/useAuth';
@@ -8,6 +8,7 @@ import { UsersSettings } from '../features/settings/UsersSettings';
 
 export const SettingsPage = () => {
   const auth = useAuth();
+  const usersPage = useMatch('/app/settings/users');
   if (!auth.data?.loggedIn || auth.data.disabled) return null;
   const admin = hasPermission(auth.data, 'Administrator');
   const tabs = [
@@ -19,7 +20,7 @@ export const SettingsPage = () => {
   ];
 
   return (
-    <div className="min-h-dvh bg-slate-950">
+    <div className="flex h-dvh flex-col overflow-hidden bg-slate-950">
       <PageHeader />
       <div className="ui-toolbar">
         <nav aria-label="Settings sections" className="flex flex-wrap gap-2">
@@ -35,7 +36,9 @@ export const SettingsPage = () => {
           ))}
         </nav>
       </div>
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className={usersPage
+        ? 'relative flex min-h-0 flex-1 overflow-hidden'
+        : 'mx-auto w-full max-w-6xl flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8'}>
         <Routes>
           <Route index element={<AccountSettings />} />
           <Route path="users" element={admin ? <UsersSettings currentEmail={auth.data.email} /> : <Navigate to="/app/settings" replace />} />

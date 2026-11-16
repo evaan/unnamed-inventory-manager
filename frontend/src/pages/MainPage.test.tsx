@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MainPage } from './MainPage';
+import { ConfirmProvider } from '../components/ConfirmProvider';
 import { useAuth, useLogout } from '../features/auth/useAuth';
 import { getItems, createItem, adjustItem, deleteItem, updateItem, type Item } from '../features/items/itemsapi';
 import { getTags, createTag, deleteTag, setItemTags } from '../features/items/tagsapi';
@@ -53,7 +54,7 @@ const renderMain = () =>
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
-        <MainPage />
+        <ConfirmProvider><MainPage /></ConfirmProvider>
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -326,11 +327,12 @@ describe('MainPage: delete', () => {
   });
 
   it('deletes the item after the user confirms', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(deleteItem).mockResolvedValue(undefined as never);
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /led red/i }));
     await userEvent.click(screen.getByTitle('Delete item'));
+    expect(deleteItem).not.toHaveBeenCalled();
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete item' }));
 
     expect(deleteItem).toHaveBeenCalledWith('3');
     await waitFor(() => expect(screen.queryByText('LED Red')).not.toBeInTheDocument());
@@ -338,21 +340,21 @@ describe('MainPage: delete', () => {
   });
 
   it('does not delete when the user cancels the confirm dialog', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /led red/i }));
     await userEvent.click(screen.getByTitle('Delete item'));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(deleteItem).not.toHaveBeenCalled();
     expect(screen.getByText('3 of 3')).toBeInTheDocument();
   });
 
   it('keeps the item and shows an error when delete fails', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(deleteItem).mockRejectedValue(new Error('Delete failed'));
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /led red/i }));
     await userEvent.click(screen.getByTitle('Delete item'));
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete item' }));
 
     expect(await screen.findByText('Delete failed')).toBeInTheDocument();
     expect(screen.getByText('3 of 3')).toBeInTheDocument();
@@ -392,7 +394,6 @@ describe('MainPage: new item', () => {
   });
 
   it.each(['cancel', 'escape', 'row', 'new', 'navigation', 'logout'])('keeps unsaved values when declining to discard via %s', async (action) => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
     await userEvent.type(screen.getByLabelText('Name'), 'Unsaved widget');
@@ -402,32 +403,42 @@ describe('MainPage: new item', () => {
     if (action === 'new') await userEvent.click(screen.getByRole('button', { name: /^new item$/i }));
     if (action === 'navigation') await userEvent.click(screen.getByRole('link', { name: 'Bookings' }));
     if (action === 'logout') await userEvent.click(screen.getByRole('button', { name: /log out/i }));
-    expect(confirm).toHaveBeenCalledWith('Discard your unsaved changes?');
+    expect(screen.getByRole('alertdialog', { name: 'Discard unsaved changes?' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
     expect(screen.getByLabelText('Name')).toHaveValue('Unsaved widget');
     expect(logoutMutate).not.toHaveBeenCalled();
   });
 
   it('discards a dirty draft only after confirmation', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
     await userEvent.type(screen.getByLabelText('Name'), 'Unsaved widget');
     await userEvent.keyboard('{Escape}');
-    expect(confirm).toHaveBeenCalledWith('Discard your unsaved changes?');
+    expect(screen.getByRole('alertdialog', { name: 'Discard unsaved changes?' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
     expect(screen.queryByText('Draft')).not.toBeInTheDocument();
   });
 
+  it('logs out only after confirming discard', async () => {
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /^New item$/ }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Unsaved widget');
+    await userEvent.click(screen.getByRole('button', { name: /log out/i }));
+    expect(logoutMutate).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+    expect(logoutMutate).toHaveBeenCalledTimes(1);
+  });
+
   it('starts a fresh draft after confirming New item again', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /^New item$/ }));
     await userEvent.type(screen.getByLabelText('Name'), 'Old draft');
     await userEvent.click(screen.getByRole('button', { name: /^New item$/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
     expect(screen.getByLabelText('Name')).toHaveValue('');
   });
 
   it('warns before unloading with changes and removes the warning after discard', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /^New item$/ }));
     await userEvent.type(screen.getByLabelText('Name'), 'Unsaved');
@@ -435,6 +446,7 @@ describe('MainPage: new item', () => {
     window.dispatchEvent(dirtyUnload);
     expect(dirtyUnload.defaultPrevented).toBe(true);
     await userEvent.click(screen.getByRole('button', { name: /^Cancel$/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
     const cleanUnload = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(cleanUnload);
     expect(cleanUnload.defaultPrevented).toBe(false);
@@ -608,13 +620,13 @@ describe('MainPage: editing item details', () => {
   });
 
   it('asks before abandoning edits and restores read-only details after confirmation', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     await openEdit();
     await userEvent.type(screen.getByLabelText('Name'), ' changed');
     await userEvent.keyboard('{Escape}');
+    await userEvent.keyboard('{Escape}');
     expect(screen.getByLabelText('Name')).toHaveValue('Resistor 4.7k changed');
-    confirm.mockReturnValue(true);
     await userEvent.click(screen.getByRole('button', { name: /^Cancel$/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
     expect(screen.getByRole('heading', { name: 'Resistor 4.7k' })).toBeInTheDocument();
     expect(updateItem).not.toHaveBeenCalled();
   });
@@ -669,10 +681,11 @@ describe('MainPage: tag permissions', () => {
 
   it('deletes a global tag with DeleteTag permission', async () => {
     setPermissions(['DeleteTag']);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(deleteTag).mockResolvedValue(undefined);
     await openItem();
     await userEvent.click(screen.getByRole('button', { name: 'Delete tag Resistors' }));
+    expect(deleteTag).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete tag' }));
     expect(deleteTag).toHaveBeenCalledWith(resistorTag.ID);
     await waitFor(() => expect(screen.queryByText('Resistors')).not.toBeInTheDocument());
     expect(setItemTags).not.toHaveBeenCalled();

@@ -1,403 +1,32 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Trash2, MapPin, Printer, Wrench } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowUpRight, CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../features/auth/useAuth';
+import { hasPermission } from '../features/auth/auth';
 import { DetailPanel, Workspace } from '../components/Workspace';
 import { SearchInput } from '../components/SearchInput';
 import { ErrorBanner } from '../components/ErrorBanner';
-import { Field } from '../components/Field';
-import { INPUT } from '../components/styles';
-import { ListSkeleton } from '../components/ListSkeleton';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
-import {
-  getEquipment,
-  getBookings,
-  createBooking,
-  cancelBooking,
-  type Equipment,
-  type Booking,
-  type NewBooking,
-} from '../features/bookings/bookingsapi';
+import { BookingSkeleton } from '../features/bookings/BookingSkeleton';
+import { BookingSchedule } from '../features/bookings/BookingSchedule';
+import { BookingFilters } from '../features/bookings/BookingFilters';
+import { BookingPanel } from '../features/bookings/BookingPanel';
+import { equipmentHours, fmtDay, fmtTime, sameDay, startOfDay, toDateInput, weekDates } from '../features/bookings/bookingTime';
+import { getEquipment, getBookings, createBooking, cancelBooking, updateBooking, createEquipment, updateEquipment, deleteEquipment, type Equipment, type Booking, type NewBooking, type NewEquipment } from '../features/bookings/bookingsapi';
+import { EquipmentEditor } from '../features/bookings/EquipmentEditor';
+import { canManageReservation } from '../features/bookings/bookingPermissions';
+import { useConfirm } from '../hooks/useConfirm';
 
-// Booking rules. Move these to the backend if you want them enforced server-side.
-const OPEN_HOUR = 8; // equipment can be booked from 8:00...
-const CLOSE_HOUR = 20; // ...until 20:00
-const MAX_HOURS = 8; // longest single booking
 const EMPTY_EQUIPMENT: Equipment[] = [];
 const EMPTY_BOOKINGS: Booking[] = [];
 
-/* ---------- Date helpers ---------- */
-const pad = (n: number) => String(n).padStart(2, '0');
-const toDateInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const startOfDay = (dateStr: string) => new Date(`${dateStr}T00:00`);
-const fmtTime = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-
-const fmtDay = (d: Date, now: Date) => {
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  if (sameDay(d, now)) return 'Today';
-  if (sameDay(d, tomorrow)) return 'Tomorrow';
-  return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-};
-
-const overlaps = (aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) => aStart < bEnd && bStart < aEnd;
-
-/* ---------- Availability ---------- */
-type Availability =
-  | { kind: 'maintenance' }
-  | { kind: 'in-use'; until: Date; by: string }
-  | { kind: 'free'; next: Booking | null };
-
-const getAvailability = (eq: Equipment, bookings: Booking[], now: Date): Availability => {
-  if (eq.Status === 'MAINTENANCE') return { kind: 'maintenance' };
-  const current = bookings.find((b) => new Date(b.Start) <= now && new Date(b.End) > now);
-  if (current) return { kind: 'in-use', until: new Date(current.End), by: current.Mine ? 'you' : current.UserName };
-  const next =
-    bookings
-      .filter((b) => new Date(b.Start) > now)
-      .sort((a, b) => a.Start.localeCompare(b.Start))[0] ?? null;
-  return { kind: 'free', next };
-};
-
-const BADGE: Record<Availability['kind'], { label: string; style: string }> = {
-  free: { label: 'Available', style: 'ui-badge-success' },
-  'in-use': { label: 'In use', style: 'ui-badge-warning' },
-  maintenance: { label: 'Out of service', style: 'ui-badge-danger' },
-};
-
-const availabilityText = (a: Availability, now: Date) => {
-  if (a.kind === 'maintenance') return 'Not bookable right now';
-  if (a.kind === 'in-use') return `In use by ${a.by} until ${fmtTime(a.until)}`;
-  if (a.next) return `Next booking: ${fmtDay(new Date(a.next.Start), now)} ${fmtTime(new Date(a.next.Start))}`;
-  return 'No upcoming bookings';
-};
-
-const CategoryIcon = ({ category, className }: { category: string; className?: string }) =>
-  category === '3D printers' ? <Printer className={className} /> : <Wrench className={className} />;
-
-/* ---------- Shared bits ---------- */
-const FilterChip = ({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) => (
-  <button
-    onClick={onClick}
-    aria-pressed={active}
-    className={`border px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-      active
-        ? 'border-white/30 bg-white/10 text-white'
-        : 'border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200'
-    }`}
-  >
-    {children}
-  </button>
-);
-
-/* ---------- Day timeline ---------- */
-const Timeline = ({ day, bookings }: { day: Date; bookings: Booking[] }) => {
-  const open = new Date(day);
-  open.setHours(OPEN_HOUR, 0, 0, 0);
-  const close = new Date(day);
-  close.setHours(CLOSE_HOUR, 0, 0, 0);
-  const span = close.getTime() - open.getTime();
-  const pct = (t: number) => ((t - open.getTime()) / span) * 100;
-
-  const labels: number[] = [];
-  for (let h = OPEN_HOUR; h <= CLOSE_HOUR; h += 2) labels.push(h);
-
-  return (
-    <div>
-      <div className="relative h-7 rounded-md bg-slate-950 border border-slate-800 overflow-hidden">
-        {bookings.map((b) => {
-          const s = Math.max(new Date(b.Start).getTime(), open.getTime());
-          const e = Math.min(new Date(b.End).getTime(), close.getTime());
-          if (e <= s) return null;
-          return (
-            <div
-              key={b.ID}
-              title={`${b.Mine ? 'You' : b.UserName}: ${fmtTime(new Date(b.Start))} – ${fmtTime(new Date(b.End))}`}
-              className={`absolute top-0 bottom-0 border-x ${
-                b.Mine ? 'bg-white/60 border-white/40' : 'bg-slate-600/70 border-slate-400/30'
-              }`}
-              style={{ left: `${pct(s)}%`, width: `${pct(e) - pct(s)}%` }}
-            />
-          );
-        })}
-      </div>
-      <div className="relative h-4 mt-1">
-        {labels.map((h) => (
-          <span
-            key={h}
-            className="absolute -translate-x-1/2 text-[10px] text-slate-500 tabular-nums"
-            style={{ left: `${((h - OPEN_HOUR) / (CLOSE_HOUR - OPEN_HOUR)) * 100}%` }}
-          >
-            {h % 12 === 0 ? 12 : h % 12}
-            {h < 12 ? 'a' : 'p'}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-/* ---------- Spotlight panel ---------- */
-interface PanelProps {
-  equipment: Equipment;
-  bookings: Booking[]; // this equipment's bookings only
-  now: Date;
-  onClose: () => void;
-  onBook: (booking: NewBooking) => Promise<string | null>; // returns an error message, or null on success
-  onCancel: (id: number) => void;
-  onDirtyChange: (dirty: boolean) => void;
-  onSavingChange: (saving: boolean) => void;
-  error: string;
-  onDismissError: () => void;
-  bookingsLoaded: boolean;
-}
-
-// Next whole hour (clamped into opening hours) as the default slot
-const defaultSlot = (dateStr: string, now: Date) => {
-  let startHour = OPEN_HOUR;
-  if (dateStr === toDateInput(now)) startHour = Math.min(Math.max(now.getHours() + 1, OPEN_HOUR), CLOSE_HOUR - 1);
-  return { start: `${pad(startHour)}:00`, end: `${pad(startHour + 1)}:00` };
-};
-
-const BookingPanel = ({ equipment, bookings, now, onClose, onBook, onCancel, onDirtyChange, onSavingChange, error: cancelError, onDismissError, bookingsLoaded }: PanelProps) => {
-  const today = toDateInput(now);
-  const [date, setDate] = useState(today);
-  const [slot, setSlot] = useState(() => defaultSlot(today, now));
-  const [purpose, setPurpose] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const savingRef = useRef(false);
-  const snapshot = JSON.stringify([date, slot.start, slot.end, purpose]);
-  const [savedSnapshot, setSavedSnapshot] = useState(snapshot);
-  useEffect(() => onDirtyChange(snapshot !== savedSnapshot), [snapshot, savedSnapshot, onDirtyChange]);
-
-  const availability = getAvailability(equipment, bookings, now);
-  const bookable = equipment.Status === 'ACTIVE';
-
-  const day = startOfDay(date);
-  const dayBookings = bookings
-    .filter((b) => sameDay(new Date(b.Start), day))
-    .sort((a, b) => a.Start.localeCompare(b.Start));
-
-  const changeDate = (value: string) => {
-    setDate(value);
-    setSlot(defaultSlot(value, now));
-    setError('');
-  };
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (savingRef.current || !bookable || !bookingsLoaded) return;
-    setError('');
-
-    const start = new Date(`${date}T${slot.start}`);
-    const end = new Date(`${date}T${slot.end}`);
-
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return setError('Pick a date and times.');
-    if (end <= start) return setError('End time must be after the start time.');
-    if (start < now) return setError('That start time is in the past.');
-
-    const open = new Date(day);
-    open.setHours(OPEN_HOUR, 0, 0, 0);
-    const close = new Date(day);
-    close.setHours(CLOSE_HOUR, 0, 0, 0);
-    if (start < open || end > close) return setError(`Bookings must be between ${OPEN_HOUR}:00 and ${CLOSE_HOUR}:00.`);
-    if (end.getTime() - start.getTime() > MAX_HOURS * 3600_000) {
-      return setError(`Bookings can be at most ${MAX_HOURS} hours.`);
-    }
-    if (bookings.some((b) => overlaps(start, end, new Date(b.Start), new Date(b.End)))) {
-      return setError('That time overlaps an existing booking.');
-    }
-
-    savingRef.current = true;
-    setSaving(true);
-    onSavingChange(true);
-    try {
-      const message = await onBook({
-        EquipmentID: equipment.ID,
-        Start: start.toISOString(),
-        End: end.toISOString(),
-        Purpose: purpose.trim(),
-      });
-      if (message) setError(message);
-      else {
-        setPurpose('');
-        setSavedSnapshot(JSON.stringify([date, slot.start, slot.end, '']));
-      }
-    } finally {
-      savingRef.current = false;
-      setSaving(false);
-      onSavingChange(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="px-5 pt-4 pb-3 flex items-start justify-between gap-3 border-b border-slate-800">
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold leading-snug">{equipment.Name}</h2>
-          <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-            <MapPin className="w-3 h-3 shrink-0" />
-            {equipment.Location}
-          </p>
-        </div>
-        <button
-          onClick={onClose}
-          disabled={saving}
-          aria-label="Close equipment details"
-          className="ui-icon-button -mr-1.5"
-          title="Close (Esc)"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      {cancelError && <ErrorBanner message={cancelError} onDismiss={onDismissError} />}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-        <section className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <span className={BADGE[availability.kind].style}>
-              {BADGE[availability.kind].label}
-            </span>
-            <span className="text-xs text-slate-500">{equipment.Category}</span>
-          </div>
-          <p className="text-sm text-slate-400">{availabilityText(availability, now)}</p>
-          {equipment.Description && <p className="text-sm">{equipment.Description}</p>}
-          {!bookable && equipment.MaintenanceNote && (
-            <p className="text-sm text-rose-300">{equipment.MaintenanceNote}</p>
-          )}
-        </section>
-
-        <section className="space-y-3">
-          <div className="flex items-end justify-between gap-3">
-            <Field label="Date" required className="flex-1">
-              <input type="date" required min={today} value={date} disabled={saving} onChange={(e) => changeDate(e.target.value)} className={INPUT} />
-            </Field>
-            <p className="text-sm text-slate-400 pb-1.5">{fmtDay(day, now)}</p>
-          </div>
-
-          {bookingsLoaded && <Timeline day={day} bookings={dayBookings} />}
-
-          {!bookingsLoaded ? (
-            <p className="text-xs text-rose-300">Load bookings before choosing a slot.</p>
-          ) : dayBookings.length === 0 ? (
-            <p className="text-xs text-slate-500">Nothing booked on this day.</p>
-          ) : (
-            <ul className="divide-y divide-slate-800/80">
-              {dayBookings.map((b) => {
-                const cancellable = b.Mine && new Date(b.End) > now;
-                return (
-                  <li key={b.ID} className="py-2 flex items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm tabular-nums">
-                        {fmtTime(new Date(b.Start))} – {fmtTime(new Date(b.End))}
-                      </p>
-                      <p className="text-xs text-slate-500 truncate">
-                        {b.Mine ? 'You' : b.UserName}
-                        {b.Purpose ? ` · ${b.Purpose}` : ''}
-                      </p>
-                    </div>
-                    {cancellable && (
-                      <button
-                        onClick={() => {
-                          if (window.confirm('Cancel this booking?')) onCancel(b.ID);
-                        }}
-                        className="ui-icon-button hover:!text-rose-300"
-                        disabled={saving}
-                        aria-label="Cancel booking"
-                        title="Cancel booking"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-
-        {bookable ? (
-          <form onSubmit={submit} className="space-y-3">
-            <p className="text-xs text-slate-500">
-              Book a slot on {fmtDay(day, now).toLowerCase()} ({OPEN_HOUR}:00–{CLOSE_HOUR}:00, up to {MAX_HOURS} h)
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Start" required>
-                <input
-                  type="time"
-                  disabled={saving}
-                  min={`${pad(OPEN_HOUR)}:00`}
-                  max={`${pad(CLOSE_HOUR)}:00`}
-                  required
-                  step={900}
-                  value={slot.start}
-                  onChange={(e) => {
-                    setSlot((s) => ({ ...s, start: e.target.value }));
-                    setError('');
-                  }}
-                  className={INPUT}
-                />
-              </Field>
-              <Field label="End" required>
-                <input
-                  type="time"
-                  disabled={saving}
-                  min={`${pad(OPEN_HOUR)}:00`}
-                  max={`${pad(CLOSE_HOUR)}:00`}
-                  required
-                  step={900}
-                  value={slot.end}
-                  onChange={(e) => {
-                    setSlot((s) => ({ ...s, end: e.target.value }));
-                    setError('');
-                  }}
-                  className={INPUT}
-                />
-              </Field>
-            </div>
-            <Field label="What are you using it for? (optional)">
-              <input
-                value={purpose}
-                disabled={saving}
-                onChange={(e) => setPurpose(e.target.value)}
-                placeholder="e.g. Enclosure prototype"
-                className={INPUT}
-              />
-            </Field>
-            {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
-            <button
-              type="submit"
-              disabled={saving || !bookingsLoaded}
-              className="ui-button-primary w-full"
-            >
-              {saving ? 'Booking…' : 'Book it'}
-            </button>
-          </form>
-        ) : (
-          <p className="text-sm text-slate-500">This equipment can't be booked until it's back in service.</p>
-        )}
-      </div>
-    </div>
-  );
-};
-
-/* ---------- Page ---------- */
 export const BookingsPage = () => {
-  /* Auth */
+  const confirm = useConfirm();
   const auth = useAuth();
-
-  /* Data */
   const session = auth.data?.loggedIn && !auth.data.disabled ? auth.data : null;
+  const canAdd = hasPermission(auth.data, 'BookingAdd');
+  const canModify = hasPermission(auth.data, 'BookingModify');
+  const canDelete = hasPermission(auth.data, 'BookingDelete');
+  const canViewAll = hasPermission(auth.data, 'BookingManage');
   const client = useQueryClient();
   const equipmentQuery = useQuery({ queryKey: ['equipment', session?.email], queryFn: getEquipment, enabled: !!session, retry: false });
   const bookingsKey = ['bookings', session?.email] as const;
@@ -410,219 +39,259 @@ export const BookingsPage = () => {
   const retry = () => { void equipmentQuery.refetch(); void bookingsQuery.refetch(); };
   const setBookings = (update: (previous: Booking[]) => Booking[]) =>
     client.setQueryData<Booking[]>(bookingsKey, (previous) => update(previous ?? []));
+
   const [error, setError] = useState('');
-  const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const canLeave = useUnsavedChanges(dirty, saving);
   const [query, setQuery] = useState('');
   const [now, setNow] = useState(() => new Date());
-
-  // Filters
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [category, setCategory] = useState<string | null>(null);
   const [availableNow, setAvailableNow] = useState(false);
-  const [mineOnly, setMineOnly] = useState(false);
+  const [requestedView, setView] = useState<'schedule' | 'mine' | 'all'>('schedule');
+  const view = requestedView === 'all' && !canViewAll ? 'mine' : requestedView;
+  const [scheduleDate, setScheduleDate] = useState(() => toDateInput(new Date()));
+  const [initialHour, setInitialHour] = useState<number | undefined>();
+  const [initialDuration, setInitialDuration] = useState(1);
+  const [panelVersion, setPanelVersion] = useState(0);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [editingBooking, setEditingBooking] = useState<Booking | undefined>();
+  const [equipmentEditor, setEquipmentEditor] = useState<Equipment | 'new' | null>(null);
+  const mutationRef = useRef(false);
+  const selected = equipment.find((eq) => eq.ID === selectedId) ?? null;
 
-  const fail = (e: unknown) => setError(e instanceof Error ? e.message : 'Something went wrong');
-
-  // Keep "in use" status fresh
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(id);
   }, []);
 
-  /* Spotlight */
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const selected = equipment.find((e) => e.ID === selectedId) ?? null;
-
-  const selectEquipment = (id: number | null) => {
-    if (!canLeave()) return;
-    setDirty(false);
+  const selectEquipment = (id: number | null, hour?: number, date?: string, duration = 1) => {
+    if (saving) return;
     setError('');
+    setEditingBooking(undefined);
+    if (date) setScheduleDate(date);
+    setInitialHour(hour);
+    setInitialDuration(duration);
+    setPanelVersion((version) => version + 1);
     setSelectedId(id);
+  };
+  const changeScheduleDate = (value: string) => {
+    if (saving) return;
+    setSelectedId(null);
+    setScheduleDate(value);
   };
   const closeRef = useRef(() => selectEquipment(null));
   closeRef.current = () => selectEquipment(null);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeRef.current();
-    };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented) closeRef.current(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // POST /bookings. Resolves to an error message for the form, or null when it worked.
   const book = async (booking: NewBooking): Promise<string | null> => {
     try {
       await client.cancelQueries({ queryKey: bookingsKey });
       const created = await createBooking(booking);
-      setBookings((prev) => [...prev, created]);
+      setBookings((previous) => [...previous, created]);
+      setSelectedId(null);
       return null;
     } catch (e) {
       return e instanceof Error ? e.message : 'Something went wrong';
     }
   };
-
-  // DELETE /bookings/:id
-  const cancel = async (id: number) => {
-    setError('');
+  const updateReservation = async (id: number, booking: NewBooking): Promise<string | null> => {
+    const existing = bookings.find((entry) => entry.ID === id);
+    if (!session || !existing || !canManageReservation(session, existing)) return 'You cannot edit this reservation.';
     try {
       await client.cancelQueries({ queryKey: bookingsKey });
-      await cancelBooking(id);
-      setBookings((prev) => prev.filter((b) => b.ID !== id));
+      const updated = await updateBooking(id, booking, session);
+      setBookings((previous) => previous.map((entry) => entry.ID === id ? updated : entry));
+      setSelectedId(null);
+      setEditingBooking(undefined);
+      return null;
     } catch (e) {
-      fail(e);
+      return e instanceof Error ? e.message : 'Something went wrong';
+    }
+  };
+  const editReservation = (booking: Booking) => {
+    if (saving || !canManageReservation(auth.data, booking)) return;
+    selectEquipment(booking.EquipmentID, undefined, toDateInput(new Date(booking.Start)));
+    setEditingBooking(booking);
+  };
+  const saveEquipment = async (item: NewEquipment): Promise<string | null> => {
+    if (!session || !equipmentEditor || !(equipmentEditor === 'new' ? canAdd : canModify)) return 'You cannot manage this equipment.';
+    try {
+      await client.cancelQueries({ queryKey: ['equipment', session.email] });
+      const saved = equipmentEditor === 'new' ? await createEquipment(item, session) : await updateEquipment(equipmentEditor.ID, item, session);
+      client.setQueryData<Equipment[]>(['equipment', session.email], (previous = []) =>
+        equipmentEditor === 'new' ? [...previous, saved] : previous.map((entry) => entry.ID === saved.ID ? saved : entry));
+      if (equipmentEditor === 'new') { setQuery(''); setCategory(null); setAvailableNow(false); setView('schedule'); }
+      setEquipmentEditor(null);
+      setPanelVersion((version) => version + 1);
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : 'Something went wrong';
+    }
+  };
+  const removeEquipment = async (item: Equipment) => {
+    if (!session || !canDelete || mutationRef.current || saving) return;
+    mutationRef.current = true;
+    try {
+      if (!await confirm({
+        title: 'Delete equipment?', message: `Delete ${item.Name}? All of its reservations will also be removed.`,
+        confirmLabel: 'Delete equipment', destructive: true,
+      })) return;
+      setSaving(true);
+      setError('');
+      await Promise.all([
+        client.cancelQueries({ queryKey: ['equipment', session.email] }),
+        client.cancelQueries({ queryKey: bookingsKey }),
+      ]);
+      await deleteEquipment(item.ID, session);
+      client.setQueryData<Equipment[]>(['equipment', session.email], (previous) => previous?.filter((entry) => entry.ID !== item.ID));
+      setBookings((previous) => previous.filter((booking) => booking.EquipmentID !== item.ID));
+      setSelectedId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong');
+    } finally {
+      mutationRef.current = false;
+      setSaving(false);
+    }
+  };
+  const cancel = async (id: number) => {
+    const booking = bookings.find((entry) => entry.ID === id);
+    if (!session || !booking || !canManageReservation(session, booking) || mutationRef.current || saving) return;
+    mutationRef.current = true;
+    try {
+      if (!await confirm({
+        title: 'Cancel booking?',
+        message: 'Cancel this booking? The reserved time will become available to others.',
+        confirmLabel: 'Cancel booking',
+        cancelLabel: 'Keep booking',
+        destructive: true,
+      })) return;
+      setSaving(true);
+      setError('');
+      await client.cancelQueries({ queryKey: bookingsKey });
+      await cancelBooking(id, session);
+      setBookings((previous) => previous.filter((booking) => booking.ID !== id));
+      if (editingBooking?.ID === id) { setEditingBooking(undefined); setPanelVersion((version) => version + 1); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong');
+    } finally {
+      mutationRef.current = false;
+      setSaving(false);
     }
   };
 
   const bookingsByEquipment = useMemo(() => {
     const map = new Map<number, Booking[]>();
-    for (const b of bookings) map.set(b.EquipmentID, [...(map.get(b.EquipmentID) ?? []), b]);
+    for (const booking of bookings) map.set(booking.EquipmentID, [...(map.get(booking.EquipmentID) ?? []), booking]);
     return map;
   }, [bookings]);
-
-  const categories = useMemo(() => [...new Set(equipment.map((e) => e.Category))].sort(), [equipment]);
-
-  const visible = useMemo(() => {
+  const visible = equipment.filter((eq) => {
+    if (category && eq.Category !== category) return false;
+    if (availableNow) {
+      const { open, close } = equipmentHours(eq.Category);
+      if (!bookingsQuery.data || eq.Status !== 'ACTIVE' || now.getHours() < open || now.getHours() >= close ||
+        (bookingsByEquipment.get(eq.ID) ?? []).some((booking) => new Date(booking.Start) <= now && new Date(booking.End) > now)) return false;
+    }
     const q = query.trim().toLowerCase();
-    return equipment.filter((eq) => {
-      const mine = bookingsByEquipment.get(eq.ID) ?? [];
-      if (category && eq.Category !== category) return false;
-      if (availableNow && getAvailability(eq, mine, now).kind !== 'free') return false;
-      if (mineOnly && !mine.some((b) => b.Mine && new Date(b.End) > now)) return false;
-      if (!q) return true;
-      return (
-        eq.Name.toLowerCase().includes(q) ||
-        eq.Location.toLowerCase().includes(q) ||
-        eq.Category.toLowerCase().includes(q)
-      );
-    });
-  }, [equipment, bookingsByEquipment, query, category, availableNow, mineOnly, now]);
+    return !q || [eq.Name, eq.Location, eq.Category].some((text) => text.toLowerCase().includes(q));
+  });
+  const upcoming = bookings.filter((booking) => booking.Mine && new Date(booking.End) > now)
+    .sort((a, b) => a.Start.localeCompare(b.Start));
+  const allBookings = bookings.filter((booking) => new Date(booking.End) > now)
+    .sort((a, b) => a.Start.localeCompare(b.Start));
+  const listedBookings = view === 'all' ? allBookings : upcoming;
+  const days = weekDates(now);
+  const day = startOfDay(scheduleDate);
+  const filtering = !!query.trim() || category !== null || availableNow;
 
-  const filtering = query.trim() !== '' || category !== null || availableNow || mineOnly;
-
-  // Must stay below all hooks above (rules of hooks).
-  if (!auth.data?.loggedIn || auth.data.disabled) {
-    return null;
-  }
+  if (!auth.data?.loggedIn || auth.data.disabled) return null;
 
   return (
-    <Workspace onBeforeLeave={canLeave}>
-      {/* Main: equipment list */}
-      <main className="flex-1 flex flex-col bg-slate-950 overflow-hidden min-w-0">
-        <div className="ui-toolbar">
-          <div className="min-w-0 flex-1 max-w-md">
-            <SearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder="Search equipment or location"
-              label="Search equipment"
-            />
+    <Workspace onBeforeLeave={() => !saving}>
+      <BookingFilters open={sidebarOpen} onToggleOpen={() => setSidebarOpen((open) => !open)} equipment={equipment} category={category} onCategory={setCategory} availableNow={availableNow} onAvailableNow={() => setAvailableNow((value) => !value)} />
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-slate-950">
+        <header className="shrink-0 border-b border-slate-800 px-4 pt-5 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-xl font-semibold">Equipment bookings</h1>
+            {canAdd && <button disabled={saving} onClick={() => setEquipmentEditor('new')} className="ui-button-primary"><Plus className="h-4 w-4" />Add equipment</button>}
           </div>
-          <span className="ml-auto text-xs text-slate-400 shrink-0 tabular-nums">
-            {visible.length} of {equipment.length}
-          </span>
-        </div>
-
+          <nav aria-label="Booking views" className="mt-5 flex flex-wrap gap-5">
+            <button aria-current={view === 'schedule' ? 'page' : undefined} onClick={() => setView('schedule')} className={`border-b-2 pb-3 text-sm font-medium ${view === 'schedule' ? 'border-white text-slate-100' : 'border-transparent text-slate-500'}`}>Schedule</button>
+            <button aria-current={view === 'mine' ? 'page' : undefined} onClick={() => setView('mine')} className={`border-b-2 pb-3 text-sm font-medium ${view === 'mine' ? 'border-white text-slate-100' : 'border-transparent text-slate-500'}`}>My bookings {bookingsQuery.data && <span className="ml-1 text-xs text-slate-500">({upcoming.length})</span>}</button>
+            {canViewAll && <button aria-current={view === 'all' ? 'page' : undefined} onClick={() => setView('all')} className={`border-b-2 pb-3 text-sm font-medium ${view === 'all' ? 'border-white text-slate-100' : 'border-transparent text-slate-500'}`}>All bookings {bookingsQuery.data && <span className="ml-1 text-xs text-slate-500">({allBookings.length})</span>}</button>}
+          </nav>
+        </header>
         {loadError && <ErrorBanner message={loadError.message} onRetry={retry} retrying={retrying} />}
         {error && !selected && <ErrorBanner message={error} onDismiss={() => setError('')} />}
-
-        <div className="px-4 sm:px-6 py-2.5 border-b border-slate-800 flex flex-wrap items-center gap-2">
-          <FilterChip active={category === null} onClick={() => setCategory(null)}>
-            All
-          </FilterChip>
-          {categories.map((c) => (
-            <FilterChip key={c} active={category === c} onClick={() => setCategory(category === c ? null : c)}>
-              {c}
-            </FilterChip>
-          ))}
-          <span className="w-px h-4 bg-slate-800 mx-1" />
-          <FilterChip active={availableNow} onClick={() => setAvailableNow((v) => !v)}>
-            Available now
-          </FilterChip>
-          <FilterChip active={mineOnly} onClick={() => setMineOnly((v) => !v)}>
-            My bookings
-          </FilterChip>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <ListSkeleton label="Loading equipment" equipment />
-          ) : loadError && equipment.length === 0 ? (
-            <div className="ui-empty-state"><p>Equipment could not be loaded.</p></div>
-          ) : visible.length === 0 ? (
-            <div className="ui-empty-state">
-              <p>{equipment.length === 0 ? 'No equipment yet.' : 'No equipment matches your filters.'}</p>
-              {filtering && (
-                <button
-                  onClick={() => {
-                    setQuery('');
-                    setCategory(null);
-                    setAvailableNow(false);
-                    setMineOnly(false);
-                  }}
-                  className="text-slate-200 hover:text-white"
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-          ) : (
-            <ul className="divide-y divide-slate-800/80">
-              {visible.map((eq) => {
-                const availability = getAvailability(eq, bookingsByEquipment.get(eq.ID) ?? [], now);
-                const isSelected = eq.ID === selectedId;
-                return (
-                  <li key={eq.ID}>
-                    <button
-                      onClick={() => selectEquipment(isSelected ? null : eq.ID)}
-                      aria-pressed={isSelected}
-                      className={`ui-list-row ${
-                        isSelected
-                          ? 'ui-list-row-active'
-                          : 'ui-list-row-idle'
-                      }`}
-                    >
-                      <CategoryIcon category={eq.Category} className="w-5 h-5 text-slate-500 shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{eq.Name}</p>
-                        <p className="text-xs text-slate-500 truncate">
-                          {eq.Category} · {eq.Location}
-                        </p>
-                        <p className="text-xs text-slate-400 truncate mt-0.5">{availabilityText(availability, now)}</p>
-                      </div>
-                      <span
-                        className={BADGE[availability.kind].style}
-                      >
-                        {BADGE[availability.kind].label}
-                      </span>
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+          {view === 'schedule' && <>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <section aria-label="Choose a booking day" className="grid w-full max-w-md grid-cols-7 gap-1">
+                {days.map((date) => {
+                  const value = toDateInput(date);
+                  const active = value === scheduleDate;
+                  return (
+                    <button key={value} aria-label={date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} aria-pressed={active} onClick={() => changeScheduleDate(value)} className={`rounded-sm px-1 py-1.5 text-center ${active ? 'bg-white text-slate-950' : 'bg-slate-900/50 text-slate-400 hover:bg-slate-800'}`}>
+                      <span className="block text-[10px]">{sameDay(date, now) ? 'Today' : date.toLocaleDateString([], { weekday: 'short' })}</span>
+                      <span className="block text-sm font-medium">{date.getDate()}</span>
                     </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                  );
+                })}
+              </section>
+              <div className="w-full sm:w-60"><SearchInput value={query} onChange={setQuery} placeholder="Search equipment" label="Search equipment" /></div>
+            </div>
+            <div className="mb-3 flex justify-end text-xs text-slate-400">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1.5"><span className="h-3 w-5 bg-slate-700" />Free</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-5 bg-rose-500/70" />Booked</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-5 bg-emerald-500/70" />Your booking</span>
+              </div>
+            </div>
+          </>}
+          {loading ? <BookingSkeleton view={view} />
+            : loadError && equipment.length === 0 ? <div className="ui-empty-state"><p>Equipment could not be loaded.</p></div>
+            : view !== 'schedule' ? (
+              <section aria-label={view === 'all' ? 'All bookings' : 'Your upcoming bookings'}>
+                {!bookingsQuery.data ? <p className="text-sm text-slate-400">{view === 'all' ? 'Bookings' : 'Your bookings'} could not be loaded. Try again above.</p>
+                  : listedBookings.length === 0 ? <div className="ui-empty-state"><CalendarDays className="mb-2 h-6 w-6" /><p>{view === 'all' ? 'No current or upcoming bookings.' : 'No upcoming reservations yet.'}</p><button onClick={() => setView('schedule')} className="ui-button-secondary mt-2">View schedule</button></div>
+                  : <ul className="divide-y divide-slate-800">
+                    {listedBookings.map((booking) => {
+                      const eq = equipment.find((item) => item.ID === booking.EquipmentID);
+                      const start = new Date(booking.Start);
+                      const end = new Date(booking.End);
+                      const manageable = canManageReservation(auth.data, booking) && end > now;
+                      const bookingLabel = view === 'all' ? `${booking.Mine ? 'you' : booking.UserName} on ${eq?.Name ?? 'equipment'}` : eq?.Name ?? 'equipment';
+                      return (
+                        <li key={booking.ID} className="flex flex-wrap items-center gap-3 py-4">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium">{eq?.Name ?? 'Equipment'}</p>
+                            {view === 'all' && <p className="mt-1 text-sm text-slate-300">{booking.Mine ? 'You' : booking.UserName} · <span className="text-xs text-slate-400">{start <= now ? 'In progress' : 'Upcoming'}</span></p>}
+                            <p className="mt-1 text-xs text-slate-400">{fmtDay(start, now)} · {fmtTime(start)} – {!sameDay(start, end) && `${fmtDay(end, now)} · `}{fmtTime(end)}</p>
+                            <p className="mt-1 text-xs text-slate-500">{eq?.Location}{booking.Purpose ? ` · ${booking.Purpose}` : ''}</p>
+                          </div>
+                          {eq && <button disabled={saving} onClick={() => selectEquipment(eq.ID, undefined, toDateInput(start) < toDateInput(now) ? toDateInput(now) : toDateInput(start))} className="ui-icon-button" aria-label={`View booking for ${bookingLabel}`}><ArrowUpRight className="h-4 w-4" /></button>}
+                          {manageable && eq?.Status === 'ACTIVE' && start > now && <button aria-label={`Edit booking for ${bookingLabel}`} disabled={saving} onClick={() => editReservation(booking)} className="ui-icon-button"><Pencil className="h-4 w-4" /></button>}
+                          {manageable && <button aria-label={`Cancel booking for ${bookingLabel}`} disabled={saving} onClick={() => void cancel(booking.ID)} className="ui-button-secondary hover:!text-rose-300"><Trash2 className="h-4 w-4" />Cancel</button>}
+                        </li>
+                      );
+                    })}
+                  </ul>}
+              </section>
+            ) : visible.length === 0 ? (
+              <div className="ui-empty-state">
+                <p>{equipment.length === 0 ? 'No equipment yet.' : 'No equipment matches your filters.'}</p>
+                {filtering && <button onClick={() => { setQuery(''); setCategory(null); setAvailableNow(false); }} className="text-slate-200 hover:text-white">Clear filters</button>}
+              </div>
+            ) : <BookingSchedule equipment={visible} bookings={bookingsByEquipment} day={day} now={now} selectedId={selectedId} loaded={bookingsQuery.data !== undefined} onSelect={(id, hour, duration) => selectEquipment(id, hour, undefined, duration)} />}
         </div>
       </main>
-
-      {/* Spotlight: opens on the far right when a row is selected */}
       <DetailPanel label="Equipment details" open={!!selected}>
-        {selected && (
-          <BookingPanel
-            key={selected.ID}
-            equipment={selected}
-            bookings={bookingsByEquipment.get(selected.ID) ?? []}
-            now={now}
-            onClose={() => selectEquipment(null)}
-            onBook={book}
-            onCancel={cancel}
-            onDirtyChange={setDirty}
-            onSavingChange={setSaving}
-            error={error}
-            onDismissError={() => setError('')}
-            bookingsLoaded={bookingsQuery.data !== undefined}
-          />
-        )}
+        {selected && <BookingPanel key={`${selected.ID}-${panelVersion}`} equipment={selected} initialDate={scheduleDate} initialHour={initialHour} initialDuration={initialDuration} bookings={bookingsByEquipment.get(selected.ID) ?? []} now={now} onClose={() => selectEquipment(null)} onBook={book} onCancel={cancel} onSavingChange={setSaving} error={error} onDismissError={() => setError('')} bookingsLoaded={bookingsQuery.data !== undefined} auth={session!} initialBooking={editingBooking} onUpdate={updateReservation} onEditEquipment={canModify ? () => setEquipmentEditor(selected) : undefined} onDeleteEquipment={canDelete ? () => void removeEquipment(selected) : undefined} busy={saving} />}
       </DetailPanel>
+      {equipmentEditor && (equipmentEditor === 'new' ? canAdd : canModify) && <EquipmentEditor equipment={equipmentEditor === 'new' ? null : equipmentEditor} categories={[...new Set(equipment.map((item) => item.Category))]} onSave={saveEquipment} onClose={() => setEquipmentEditor(null)} onSavingChange={setSaving} />}
     </Workspace>
   );
 };

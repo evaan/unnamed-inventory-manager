@@ -5,6 +5,7 @@ import { ItemForm } from './ItemForm';
 import type { Item, NewItem } from './itemsapi';
 import type { TagID } from './tagsapi';
 import { getStock, STOCK_STYLES } from './itemStock';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const Detail = ({ label, children }: { label: string; children: ReactNode }) => (
   <div>
@@ -46,6 +47,7 @@ export const ItemDetails = ({
   onDelete: (id: string) => void;
   onDismissError: () => void;
 }) => {
+  const confirm = useConfirm();
   const [tagIds, setTagIds] = useState<TagID[]>([]);
   const [formDirty, setFormDirty] = useState(false);
   useEffect(() => {
@@ -65,7 +67,9 @@ export const ItemDetails = ({
             <button onClick={onEdit} disabled={adjusting} aria-label="Edit item" title="Edit item" className="ui-icon-button"><Pencil className="h-4 w-4" /></button>
           )}
           {!isDraft && !editing && canDelete && (
-            <button onClick={() => { if (window.confirm(`Delete "${item.itemName}"? This can't be undone.`)) onDelete(item.id); }} disabled={saving || adjusting} aria-label="Delete item" title="Delete item" className="ui-icon-button hover:!text-rose-300"><Trash2 className="h-4 w-4" /></button>
+            <button onClick={async () => {
+              if (await confirm({ title: 'Delete item?', message: `Delete "${item.itemName}"? This can't be undone.`, confirmLabel: 'Delete item', destructive: true })) onDelete(item.id);
+            }} disabled={saving || adjusting} aria-label="Delete item" title="Delete item" className="ui-icon-button hover:!text-rose-300"><Trash2 className="h-4 w-4" /></button>
           )}
           <button onClick={onClose} disabled={saving} aria-label={isDraft ? 'Cancel new item' : 'Close item details'} title={isDraft ? 'Cancel (Esc)' : 'Close (Esc)'} className="ui-icon-button"><X className="h-4 w-4" /></button>
         </div>

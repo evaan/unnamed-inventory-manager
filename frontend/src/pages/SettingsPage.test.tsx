@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPage } from './SettingsPage';
+import { ConfirmProvider } from '../components/ConfirmProvider';
 import { useAuth, useLogout } from '../features/auth/useAuth';
 import { getSettings, getUsers, patchSettings, putUserPermissions, setUserDisabled } from '../features/settings/settingsapi';
 
@@ -29,9 +30,9 @@ const USERS = [
 const renderPage = (path = '/app/settings') => render(
   <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MemoryRouter initialEntries={[path]}>
-      <Routes>
+      <ConfirmProvider><Routes>
         <Route path="/app/settings/*" element={<SettingsPage />} />
-      </Routes>
+      </Routes></ConfirmProvider>
     </MemoryRouter>
   </QueryClientProvider>
 );
@@ -48,6 +49,7 @@ const openSettings = async () => {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  window.innerWidth = 1280;
   vi.mocked(useAuth).mockReturnValue({
     data: { loggedIn: true, disabled: false, name: 'Alex', email: 'alex@example.com', permissions: ['Administrator'] },
   } as never);
@@ -89,13 +91,45 @@ describe('SettingsPage: account and access', () => {
 });
 
 describe('SettingsPage: users', () => {
-  it('opens a user from the list in a modal and closes it with Escape', async () => {
+  it('opens a user in a sidebar alongside the list and closes it with Escape', async () => {
     renderPage('/app/settings/users');
     expect(screen.getByRole('status', { name: 'Loading users' })).toBeInTheDocument();
     const user = await screen.findByRole('button', { name: /Taylor taylor@example.com/ });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await userEvent.click(user);
-    expect(screen.getByRole('dialog', { name: 'Manage user' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'User details' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Users' })).toBeInTheDocument();
+    expect(user).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('complementary', { name: 'User details' })).not.toBeInTheDocument();
+    expect(user).toHaveAttribute('aria-expanded', 'false');
+    expect(user).toHaveFocus();
+  });
+
+  it('switches users directly from the list and closes with the sidebar button', async () => {
+    await openUser();
+    await userEvent.click(screen.getByRole('checkbox', { name: /^ModifyItem/ }));
+    const alex = screen.getByRole('button', { name: /Alex alex@example.com/ });
+    await userEvent.click(alex);
+    const panel = screen.getByRole('complementary', { name: 'User details' });
+    expect(within(panel).getByRole('heading', { name: 'Alex (you)' })).toBeInTheDocument();
+    expect(within(panel).getByRole('checkbox', { name: /^Administrator/ })).toBeChecked();
+    expect(within(panel).getByRole('checkbox', { name: /^ModifyItem/ })).not.toBeChecked();
+    await userEvent.click(within(panel).getByRole('button', { name: 'Close user details' }));
+    expect(screen.queryByRole('complementary', { name: 'User details' })).not.toBeInTheDocument();
+    expect(alex).toHaveFocus();
+  });
+
+  it('uses a responsive side panel on small screens and restores focus when closed', async () => {
+    window.innerWidth = 800;
+    renderPage('/app/settings/users');
+    const user = await screen.findByRole('button', { name: /Taylor taylor@example.com/ });
+    await userEvent.click(user);
+    const panel = screen.getByRole('dialog', { name: 'User details' });
+    expect(panel).toHaveAttribute('aria-modal', 'true');
+    expect(screen.queryByRole('list', { name: 'Users' })).not.toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Close user details' })).toHaveFocus();
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(user).toHaveFocus();
@@ -108,6 +142,17 @@ describe('SettingsPage: users', () => {
     expect(putUserPermissions).toHaveBeenCalledWith('1', ['CreateItem', 'ModifyItem']);
     expect(await screen.findByText('Permissions saved.')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Permission name')).not.toBeInTheDocument();
+  });
+
+  it('offers separate equipment and reservation management permissions', async () => {
+    await openUser();
+    expect(screen.getByRole('checkbox', { name: /^BookingDelete/ })).toHaveAccessibleName(/^BookingDelete\s*Remove bookable equipment$/);
+    for (const permission of ['BookingAdd', 'BookingModify', 'BookingDelete', 'BookingManage']) {
+      await userEvent.click(screen.getByRole('checkbox', { name: new RegExp(`^${permission}`) }));
+    }
+    await userEvent.click(screen.getByRole('button', { name: 'Save permissions' }));
+    expect(putUserPermissions).toHaveBeenCalledWith('1', ['CreateItem', 'BookingAdd', 'BookingModify', 'BookingDelete', 'BookingManage']);
+    expect(await screen.findByText('Permissions saved.')).toBeInTheDocument();
   });
 
   it('disables and enables another user without a confirmation popup', async () => {
@@ -127,6 +172,49 @@ describe('SettingsPage: users', () => {
     expect(button).toBeDisabled();
     await userEvent.click(button);
     expect(setUserDisabled).not.toHaveBeenCalled();
+  });
+
+  it.each([1280, 800])('prevents removing your own Administrator permission at %ipx but allows other changes', async (width) => {
+    window.innerWidth = width;
+    renderPage('/app/settings/users');
+    await userEvent.click(await screen.findByRole('button', { name: /Alex alex@example.com/ }));
+    const administrator = screen.getByRole('checkbox', { name: /^Administrator/ });
+    expect(administrator).toBeChecked();
+    expect(administrator).toBeDisabled();
+    expect(administrator).toHaveAccessibleDescription(/You can't remove your own Administrator permission/);
+    await userEvent.click(administrator);
+    expect(administrator).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Save permissions' })).toBeDisabled();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(putUserPermissions).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('checkbox', { name: /^ModifyItem/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save permissions' }));
+    expect(putUserPermissions).toHaveBeenCalledWith('2', ['Administrator', 'ModifyItem']);
+    expect(await screen.findByText('Permissions saved.')).toBeInTheDocument();
+    expect(administrator).toBeChecked();
+    expect(administrator).toBeDisabled();
+  });
+
+  it.each([1280, 800])('still confirms removing another user’s Administrator permission at %ipx', async (width) => {
+    window.innerWidth = width;
+    vi.mocked(getUsers).mockResolvedValue([
+      { ...USERS[0], permissions: ['Administrator'] },
+      USERS[1],
+    ]);
+    await openUser();
+    const administrator = screen.getByRole('checkbox', { name: /^Administrator/ });
+    expect(administrator).toBeEnabled();
+    await userEvent.click(administrator);
+    const saveButton = screen.getByRole('button', { name: 'Save permissions' });
+    await userEvent.click(saveButton);
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Remove Administrator from taylor@example.com?');
+    expect(putUserPermissions).not.toHaveBeenCalled();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole(width < 1024 ? 'dialog' : 'complementary', { name: 'User details' })).toBeInTheDocument();
+    expect(saveButton).toHaveFocus();
+    await userEvent.click(saveButton);
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Administrator' }));
+    expect(putUserPermissions).toHaveBeenCalledWith('1', []);
   });
 
 });

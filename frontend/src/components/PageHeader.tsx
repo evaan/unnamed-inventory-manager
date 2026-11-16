@@ -4,7 +4,7 @@ import { ErrorBanner } from './ErrorBanner';
 import { PageNavigation } from './PageNavigation';
 import { ThemeToggle } from './ThemeToggle';
 
-export const PageHeader = ({ onBeforeLogout }: { onBeforeLogout?: () => boolean }) => {
+export const PageHeader = ({ onBeforeLogout }: { onBeforeLogout?: () => boolean | Promise<boolean> }) => {
   const logout = useLogout();
 
   return (
@@ -17,7 +17,7 @@ export const PageHeader = ({ onBeforeLogout }: { onBeforeLogout?: () => boolean 
           <ThemeToggle />
           <button
             type="button"
-            onClick={() => { if (!onBeforeLogout || onBeforeLogout()) logout.mutate(); }}
+            onClick={async () => { if (!onBeforeLogout || await onBeforeLogout()) logout.mutate(); }}
             disabled={logout.isPending}
             className="ui-button-secondary"
           >
