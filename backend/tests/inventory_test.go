@@ -502,3 +502,52 @@ func TestAttachCategoryByUpdatingItem(t *testing.T) {
 		t.Errorf("Expected ManufacturerPart: A1 | Actual Value: %q", editedItem.ManufacturerPart)
 	}
 }
+
+func TestAttachInvalidCategory(t *testing.T) {
+
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db, "View", "Edit")
+
+	testItemToEdit := inventory.Item{
+		ID:               uuid.New(),
+		ItemName:         "TestItem1",
+		Quantity:         1,
+		Manufacturer:     "TestCompany",
+		ManufacturerPart: "A1",
+	}
+
+	if err := db.Create(&testItemToEdit).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	testCategory1 := inventory.ItemCategory{
+		ID:           uuid.New(),
+		CategoryName: "testCategory1",
+	}
+
+	if err := db.Create(&testCategory1).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	testCategory2 := inventory.ItemCategory{
+		ID:           uuid.New(),
+		CategoryName: "testCategory2",
+	}
+
+	if err := db.Create(&testCategory2).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	// Have random UUID in the body for testCategory2
+	body := `{
+		"categories": [
+			"` + testCategory1.ID.String() + `", 
+			"` + uuid.New().String() + `" 
+		]
+	}`
+
+	response := makeRequest(router, http.MethodPut, "/items/"+testItemToEdit.ID.String(), body, token)
+
+	// Ensure HTTP response is correct
+	requireStatus(t, response, http.StatusBadRequest)
+}
