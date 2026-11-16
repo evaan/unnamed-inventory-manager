@@ -1,6 +1,6 @@
 import { useAuth } from '../auth/useAuth';
 
-const CARD = 'rounded-xl border border-slate-800 bg-slate-900/50 p-4';
+import { CARD } from '../../components/styles';
 
 export const AccountSettings = () => {
   const auth = useAuth();

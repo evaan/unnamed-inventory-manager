@@ -39,12 +39,12 @@ export default function ParticlesBG() {
     pauseOnBlur: true,
     pauseOnOutsideViewport: true,
     particles: {
-      color: { value: '#00ADD8' },
+      color: { value: '#a1a1aa' },
       links: {
-        color: '#00ADD8',
+        color: '#71717a',
         distance: 150,
         enable: true,
-        opacity: 0.4,
+        opacity: 0.2,
         width: 1,
       },
       move: {
@@ -54,7 +54,7 @@ export default function ParticlesBG() {
         speed: 1.5,
       },
       number: { density: { enable: true }, value: 80 },
-      opacity: { value: 0.8 },
+      opacity: { value: 0.4 },
       shape: { type: 'circle' },
       size: { value: { min: 1, max: 4 } },
     },

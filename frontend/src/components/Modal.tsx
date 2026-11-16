@@ -74,7 +74,7 @@ export const Modal = ({ title, children, onClose }: {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 font-sans text-slate-100 shadow-2xl"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 font-sans text-slate-100 shadow-2xl"
       >
         <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-5 py-4">
           <h2 id={titleId} className="text-base font-semibold">{title}</h2>
@@ -82,7 +82,7 @@ export const Modal = ({ title, children, onClose }: {
             type="button"
             aria-label="Close modal"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            className="ui-icon-button"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ListSkeleton } from '../../components/ListSkeleton';
 import { EmailDomainList } from './EmailDomainList';
 import { getSettings, patchSettings, settingsQueryKey, type AppSettings as SettingsValues } from './settingsapi';
-import { BUTTON, CARD, INPUT } from './styles';
+import { BUTTON, CARD, INPUT } from '../../components/styles';
 
 const settingLabel = (name: string) => name === 'signup_policy' ? 'Automatically Disable New Users' : name.split('_')
   .filter(Boolean)

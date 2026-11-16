@@ -3,12 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, UserRound } from 'lucide-react';
 import { ListSkeleton } from '../../components/ListSkeleton';
 import { Modal } from '../../components/Modal';
+import { SearchInput } from '../../components/SearchInput';
 import { authQueryKey } from '../auth/auth';
 import { PERMISSIONS } from '../auth/permissions';
 import {
   getUsers, putUserPermissions, setUserDisabled, usersQueryKey, type ManagedUser,
 } from './settingsapi';
-import { BUTTON, CARD, INPUT } from './styles';
+import { BUTTON, CARD } from '../../components/styles';
 
 const UserEditor = ({ user, currentEmail }: { user: ManagedUser; currentEmail: string }) => {
   const queryClient = useQueryClient();
@@ -56,7 +57,7 @@ const UserEditor = ({ user, currentEmail }: { user: ManagedUser; currentEmail: s
           type="button"
           disabled={busy || isSelf}
           title={isSelf ? "You can't disable your own account." : undefined}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="ui-button-secondary"
           onClick={() => {
             if (isSelf) return;
             save.reset();
@@ -88,7 +89,7 @@ const UserEditor = ({ user, currentEmail }: { user: ManagedUser; currentEmail: s
                   type="checkbox"
                   checked={permissions.includes(permission)}
                   onChange={() => toggle(permission)}
-                  className="mt-0.5 accent-blue-500"
+                  className="mt-0.5 accent-white"
                 />
                 <span className="min-w-0">
                   <span className="block text-sm break-all">{permission}</span>
@@ -134,10 +135,9 @@ export const UsersSettings = ({ currentEmail }: { currentEmail: string }) => {
     <section>
       <h2 className="text-base font-semibold">Users</h2>
       <p className="mt-1 text-sm text-slate-400">Manage permissions and account access.</p>
-      <label className="mt-5 block max-w-sm">
-        <span className="sr-only">Search users</span>
-        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search users by name or email" className={INPUT} />
-      </label>
+      <div className="mt-5 max-w-sm">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search users by name or email" label="Search users" />
+      </div>
       <ul aria-label="Users" className="mt-5 overflow-hidden rounded-xl border border-slate-800 divide-y divide-slate-800">
         {filtered.map((user) => (
           <li key={user.id}>
@@ -146,7 +146,7 @@ export const UsersSettings = ({ currentEmail }: { currentEmail: string }) => {
               aria-haspopup="dialog"
               aria-expanded={user.id === selectedId}
               onClick={() => setSelectedId(user.id)}
-              className="flex w-full items-center gap-4 p-4 text-left transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400"
+              className="flex w-full items-center gap-4 p-4 text-left transition-colors hover:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white"
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-400">
                 <UserRound className="h-4 w-4" aria-hidden="true" />
@@ -157,9 +157,7 @@ export const UsersSettings = ({ currentEmail }: { currentEmail: string }) => {
                 </span>
                 <span className="mt-1 block truncate text-xs text-slate-500">{user.email}</span>
               </span>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
-                user.disabled ? 'bg-rose-500/10 text-rose-300' : 'bg-emerald-500/10 text-emerald-300'
-              }`}>
+              <span className={user.disabled ? 'ui-badge-danger' : 'ui-badge-success'}>
                 {user.disabled ? 'Disabled' : 'Active'}
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
