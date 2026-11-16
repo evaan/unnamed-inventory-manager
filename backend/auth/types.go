@@ -11,6 +11,10 @@ const (
 	PermissionCreateItem    = "CreateItem"
 	PermissionDeleteItem    = "DeleteItem"
 	PermissionModifyItem    = "ModifyItem"
+	PermissionBookingAdd    = "BookingAdd"
+	PermissionBookingModify = "BookingModify"
+	PermissionBookingDelete = "BookingDelete"
+	PermissionBookingManage = "BookingManage"
 )
 
 type User struct {

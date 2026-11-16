@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -74,7 +75,7 @@ func GetPermissionsFromId(c *gin.Context, db *gorm.DB) {
 }
 
 // @Summary		Replace a user's permissions
-// @Description	Replace the user's permissions, or send an empty list to clear them. Admin only, using the session cookie
+// @Description	Replace the user's permissions, or send an empty list to clear them. Admin only, using the session cookie. Administrators cannot remove their own Administrator permission.
 // @Tags			Auth
 // @Accept			json
 // @Param			id		path	string					true	"User ID"	Format(uuid)
@@ -83,7 +84,7 @@ func GetPermissionsFromId(c *gin.Context, db *gorm.DB) {
 // @Success		204		"Permissions updated"
 // @Failure		400		"Invalid user ID or request body"
 // @Failure		401		"Not logged in"
-// @Failure		403		"Not an administrator or invalid frontend Origin or Referer"
+// @Failure		403		"Not an administrator, removing own Administrator permission, or invalid frontend Origin or Referer"
 // @Failure		404		"User not found"
 // @Failure		500		"Error updating permissions"
 // @Router			/permissions/{id} [put]
@@ -97,6 +98,16 @@ func PutPermissions(c *gin.Context, db *gorm.DB) {
 	var req PutPermissionsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	currentUser, err := GetUser(c)
+	if err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	if currentUser.ID == userID && !slices.Contains(req.Permissions, PermissionAdministrator) {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "You cannot remove your own Administrator permission."})
 		return
 	}
 

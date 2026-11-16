@@ -26,6 +26,7 @@ import { ItemDetails } from '../features/items/ItemDetails';
 import { getStock, STOCK_STYLES } from '../features/items/itemStock';
 import { useInventoryData } from '../features/items/useInventoryData';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
+import { useConfirm } from '../hooks/useConfirm';
 import { TagChip, TagEditor, TagSidebar } from '../features/items/ItemTags';
 
 type TaggedItem = WithTags<Item>;
@@ -50,6 +51,7 @@ const tagIdsOf = (item: TaggedItem) => (item.Tags ?? []).map((t) => t.ID);
 
 /* ---------- Page ---------- */
 export const MainPage = () => {
+  const confirm = useConfirm();
   /* Auth */
   const auth = useAuth();
   const canCreateItem = hasPermission(auth.data, 'CreateItem');
@@ -87,8 +89,8 @@ export const MainPage = () => {
   const spotlightItem =
     selectedId === DRAFT_ID ? draft : items.find((i) => i.id === selectedId) ?? null;
 
-  const selectItem = (id: string | null) => {
-    if (!canLeave()) return;
+  const selectItem = async (id: string | null) => {
+    if (!await canLeave()) return;
     if (id !== DRAFT_ID) setDraft(null);
     setDirty(false);
     setEditing(false);
@@ -96,8 +98,8 @@ export const MainPage = () => {
     setSelectedId(id);
   };
 
-  const cancelForm = () => {
-    if (!canLeave()) return;
+  const cancelForm = async () => {
+    if (!await canLeave()) return;
     setDirty(false);
     setError('');
     if (editing) setEditing(false);
@@ -119,8 +121,8 @@ export const MainPage = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const addItem = () => {
-    if (!canCreateItem || !itemsLoaded || !canLeave()) return;
+  const addItem = async () => {
+    if (!canCreateItem || !itemsLoaded || !await canLeave()) return;
     setDirty(false);
     setEditing(false);
     setError('');
@@ -249,7 +251,12 @@ export const MainPage = () => {
   // DELETE /tags/:id
   const removeTag = async (tag: Tag) => {
     if (!canDeleteTags) return;
-    if (!window.confirm(`Delete the tag "${tag.Name}"? It will be removed from every item.`)) return;
+    if (!await confirm({
+      title: 'Delete tag?',
+      message: `Delete the tag "${tag.Name}"? It will be removed from every item.`,
+      confirmLabel: 'Delete tag',
+      destructive: true,
+    })) return;
     setError('');
     try {
       await Promise.all([cancelItems(), cancelTags()]);

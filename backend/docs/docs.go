@@ -396,7 +396,7 @@ const docTemplate = `{
                 }
             },
             "put": {
-                "description": "Replace the user's permissions, or send an empty list to clear them. Admin only, using the session cookie",
+                "description": "Replace the user's permissions, or send an empty list to clear them. Admin only, using the session cookie. Administrators cannot remove their own Administrator permission.",
                 "consumes": [
                     "application/json"
                 ],
@@ -440,7 +440,7 @@ const docTemplate = `{
                         "description": "Not logged in"
                     },
                     "403": {
-                        "description": "Not an administrator or invalid frontend Origin or Referer"
+                        "description": "Not an administrator, removing own Administrator permission, or invalid frontend Origin or Referer"
                     },
                     "404": {
                         "description": "User not found"
