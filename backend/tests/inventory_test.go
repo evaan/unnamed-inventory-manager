@@ -654,3 +654,50 @@ func TestNoNewFieldsItem(t *testing.T) {
 		t.Errorf("Expected ManufacturerPart: A1 | Actual Value: %q", unEditedItem.ManufacturerPart)
 	}
 }
+
+func TestGetCategories(t *testing.T) {
+
+	router, db := newAuthRouter(t)
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
+
+	testCategory1 := inventory.ItemCategory{
+		ID:           uuid.New(),
+		CategoryName: "testCategory1",
+	}
+
+	if err := db.Create(&testCategory1).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	testCategory2 := inventory.ItemCategory{
+		ID:           uuid.New(),
+		CategoryName: "testCategory2",
+	}
+
+	if err := db.Create(&testCategory2).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	response := makeRequest(router, http.MethodGet, "/categories", "", adminToken)
+
+	// Ensure HTTP response is correct
+	requireStatus(t, response, http.StatusOK)
+
+	var retrievedCategories []inventory.ItemCategory
+
+	if err := db.Find(&retrievedCategories).Error; err != nil {
+		t.Fatalf("Error while trying to retrieve categories: %v", err)
+	}
+
+	// Ensure Categories are successfully retrieved
+	if !slices.ContainsFunc(retrievedCategories, func(category inventory.ItemCategory) bool {
+		return category.ID == testCategory1.ID
+	}) {
+		t.Errorf("Couldn't find testCategory1 ID")
+	}
+	if !slices.ContainsFunc(retrievedCategories, func(category inventory.ItemCategory) bool {
+		return category.ID == testCategory2.ID
+	}) {
+		t.Errorf("Couldn't find testCategory2 ID")
+	}
+}
