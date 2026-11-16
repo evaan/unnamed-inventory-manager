@@ -3,6 +3,12 @@ export type AuthState =
   | { loggedIn: true; disabled: true }
   | { loggedIn: true; disabled: false; name: string; email: string; permissions: string[] };
 
+export function hasPermission(auth: AuthState | undefined, permission: string): boolean {
+  return !!(auth?.loggedIn && !auth.disabled && auth.permissions?.some(
+    (value) => value === permission || value === 'Administrator'
+  ));
+}
+
 const API = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/+$/, '');
 
 export const authQueryKey = ['auth', 'whoami'] as const;

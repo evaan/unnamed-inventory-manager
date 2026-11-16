@@ -8,9 +8,9 @@ import {
   Tag as TagIcon,
   PanelLeftClose,
   PanelLeftOpen,
-  CalendarClock,
 } from 'lucide-react';
 import { useAuth, useLogout } from '../features/auth/useAuth';
+import { hasPermission } from '../features/auth/auth';
 import {
   getItems,
   createItem,
@@ -28,7 +28,8 @@ import {
   type TagID,
   type WithTags,
 } from '../features/items/tagsapi';
-import { useNavigate } from 'react-router-dom';
+import { PageNavigation } from '../components/PageNavigation';
+import { ListSkeleton } from '../components/ListSkeleton';
 
 type TaggedItem = WithTags<Item>;
 
@@ -149,11 +150,15 @@ const TagChip = ({ tag, onRemove }: { tag: Tag; onRemove?: () => void }) => (
 const TagEditor = ({
   allTags,
   selectedIds,
+  canEdit,
+  canCreateTags,
   onChange,
   onCreate,
 }: {
   allTags: Tag[];
   selectedIds: TagID[];
+  canEdit: boolean;
+  canCreateTags: boolean;
   onChange: (ids: TagID[]) => void;
   onCreate: (name: string) => Promise<Tag | null>;
 }) => {
@@ -167,9 +172,10 @@ const TagEditor = ({
     (t) => !selectedIds.includes(t.ID) && t.Name.toLowerCase().includes(q)
   );
   const nameTaken = allTags.some((t) => t.Name.toLowerCase() === q);
-  const canCreate = q !== '' && !nameTaken;
+  const canCreate = canEdit && canCreateTags && q !== '' && !nameTaken;
 
   const add = (id: TagID) => {
+    if (!canEdit) return;
     onChange([...selectedIds, id]);
     setText('');
   };
@@ -196,54 +202,60 @@ const TagEditor = ({
       <div className="flex flex-wrap gap-1.5 mb-2">
         {selected.length === 0 && <span className="text-xs text-slate-600">No tags yet</span>}
         {selected.map((t) => (
-          <TagChip key={t.ID} tag={t} onRemove={() => onChange(selectedIds.filter((id) => id !== t.ID))} />
+          <TagChip
+            key={t.ID}
+            tag={t}
+            onRemove={canEdit ? () => onChange(selectedIds.filter((id) => id !== t.ID)) : undefined}
+          />
         ))}
       </div>
 
-      <div className="relative">
-        <input
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
-          onKeyDown={onKeyDown}
-          placeholder="Add a tag…"
-          disabled={busy}
-          className={INPUT}
-        />
-        {open && (suggestions.length > 0 || canCreate) && (
-          <ul className="absolute z-10 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950 shadow-lg py-1">
-            {suggestions.map((t) => (
-              <li key={t.ID}>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => add(t.ID)}
-                  className="w-full text-left px-2.5 py-1.5 text-sm hover:bg-slate-800 truncate"
-                >
-                  {t.Name}
-                </button>
-              </li>
-            ))}
-            {canCreate && (
-              <li>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => void create()}
-                  className="w-full text-left px-2.5 py-1.5 text-sm text-indigo-300 hover:bg-slate-800 flex items-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">Create “{text.trim()}”</span>
-                </button>
-              </li>
-            )}
-          </ul>
-        )}
-      </div>
+      {canEdit && (
+        <div className="relative">
+          <input
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setOpen(false)}
+            onKeyDown={onKeyDown}
+            placeholder="Add a tag…"
+            disabled={busy}
+            className={INPUT}
+          />
+          {open && (suggestions.length > 0 || canCreate) && (
+            <ul className="absolute z-10 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950 shadow-lg py-1">
+              {suggestions.map((t) => (
+                <li key={t.ID}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => add(t.ID)}
+                    className="w-full text-left px-2.5 py-1.5 text-sm hover:bg-slate-800 truncate"
+                  >
+                    {t.Name}
+                  </button>
+                </li>
+              ))}
+              {canCreate && (
+                <li>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => void create()}
+                    className="w-full text-left px-2.5 py-1.5 text-sm text-indigo-300 hover:bg-slate-800 flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Create “{text.trim()}”</span>
+                  </button>
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -256,6 +268,8 @@ const TagSidebar = ({
   counts,
   totalItems,
   activeIds,
+  canCreateTags,
+  canDeleteTags,
   onToggleTag,
   onClearTags,
   onCreate,
@@ -267,6 +281,8 @@ const TagSidebar = ({
   counts: Map<TagID, number>;
   totalItems: number;
   activeIds: TagID[];
+  canCreateTags: boolean;
+  canDeleteTags: boolean;
   onToggleTag: (id: TagID) => void;
   onClearTags: () => void;
   onCreate: (name: string) => Promise<Tag | null>;
@@ -276,6 +292,7 @@ const TagSidebar = ({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canCreateTags) return;
     const tag = await onCreate(name);
     if (tag) setName('');
   };
@@ -327,7 +344,7 @@ const TagSidebar = ({
 
             {tags.length === 0 && (
               <p className="px-2.5 py-3 text-xs text-slate-500">
-                No tags yet. Create one below, then add it to items.
+                {canCreateTags ? 'No tags yet. Create one below, then add it to items.' : 'No tags yet.'}
               </p>
             )}
 
@@ -348,39 +365,45 @@ const TagSidebar = ({
                       <TagIcon className={`w-3.5 h-3.5 shrink-0 ${active ? 'text-indigo-300' : 'text-slate-500'}`} />
                       <span className="truncate">{tag.Name}</span>
                     </span>
-                    <span className="text-xs tabular-nums text-slate-500 group-hover:opacity-0 focus-within:opacity-0">
+                    <span className={`text-xs tabular-nums text-slate-500 ${
+                      canDeleteTags ? 'group-hover:opacity-0 focus-within:opacity-0' : ''
+                    }`}>
                       {counts.get(tag.ID) ?? 0}
                     </span>
                   </button>
-                  <button
-                    onClick={() => onDelete(tag)}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded text-slate-500 hover:text-rose-300 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-                    title={`Delete tag "${tag.Name}"`}
-                    aria-label={`Delete tag ${tag.Name}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {canDeleteTags && (
+                    <button
+                      onClick={() => onDelete(tag)}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded text-slate-500 hover:text-rose-300 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                      title={`Delete tag "${tag.Name}"`}
+                      aria-label={`Delete tag ${tag.Name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          <form onSubmit={submit} className="p-2 border-t border-slate-800 flex gap-1.5">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="New tag"
-              className={INPUT}
-            />
-            <button
-              type="submit"
-              disabled={!name.trim()}
-              className="p-2 rounded-lg bg-blue-500 hover:bg-blue-400 disabled:opacity-40 disabled:hover:bg-blue-500 text-white transition-colors shrink-0"
-              title="Create tag"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </form>
+          {canCreateTags && (
+            <form onSubmit={submit} className="p-2 border-t border-slate-800 flex gap-1.5">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="New tag"
+                className={INPUT}
+              />
+              <button
+                type="submit"
+                disabled={!name.trim()}
+                className="p-2 rounded-lg bg-blue-500 hover:bg-blue-400 disabled:opacity-40 disabled:hover:bg-blue-500 text-white transition-colors shrink-0"
+                title="Create tag"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </form>
+          )}
         </div>
       ) : (
         <button
@@ -402,6 +425,8 @@ const NewItemForm = ({
   item,
   saving,
   allTags,
+  canEditTags,
+  canCreateTags,
   onCreateTag,
   onSave,
   onCancel,
@@ -409,6 +434,8 @@ const NewItemForm = ({
   item: Item;
   saving: boolean;
   allTags: Tag[];
+  canEditTags: boolean;
+  canCreateTags: boolean;
   onCreateTag: (name: string) => Promise<Tag | null>;
   onSave: (item: NewItem, tagIds: TagID[]) => void;
   onCancel: () => void;
@@ -427,7 +454,7 @@ const NewItemForm = ({
       setError('Name, manufacturer and manufacturer part # are required.');
       return;
     }
-    onSave(fromDraft(d), tagIds);
+    onSave(fromDraft(d), canEditTags ? tagIds : []);
   };
 
   return (
@@ -471,7 +498,14 @@ const NewItemForm = ({
 
         <section>
           <p className="text-xs text-slate-500 mb-1">Tags</p>
-          <TagEditor allTags={allTags} selectedIds={tagIds} onChange={setTagIds} onCreate={onCreateTag} />
+          <TagEditor
+            allTags={allTags}
+            selectedIds={tagIds}
+            canEdit={canEditTags}
+            canCreateTags={canCreateTags}
+            onChange={setTagIds}
+            onCreate={onCreateTag}
+          />
         </section>
 
         {error && <p className="text-sm text-rose-300">{error}</p>}
@@ -502,6 +536,9 @@ const NewItemForm = ({
 interface SpotlightProps {
   item: TaggedItem;
   isDraft: boolean;
+  canDeleteItem: boolean;
+  canEditTags: boolean;
+  canCreateTags: boolean;
   saving: boolean;
   allTags: Tag[];
   onClose: () => void;
@@ -516,6 +553,9 @@ interface SpotlightProps {
 const SpotlightPanel = ({
   item,
   isDraft,
+  canDeleteItem,
+  canEditTags,
+  canCreateTags,
   saving,
   allTags,
   onClose,
@@ -542,7 +582,7 @@ const SpotlightPanel = ({
           )}
         </div>
         <div className="flex items-center gap-1 -mr-1.5 shrink-0">
-          {!isDraft && (
+          {!isDraft && canDeleteItem && (
             <button
               onClick={() => {
                 if (window.confirm(`Delete "${item.itemName}"? This can't be undone.`)) onDelete(item.id);
@@ -568,6 +608,8 @@ const SpotlightPanel = ({
           item={item}
           saving={saving}
           allTags={allTags}
+          canEditTags={canEditTags}
+          canCreateTags={canCreateTags}
           onCreateTag={onCreateTag}
           onSave={onSave}
           onCancel={onCancel}
@@ -599,6 +641,8 @@ const SpotlightPanel = ({
             <TagEditor
               allTags={allTags}
               selectedIds={tagIdsOf(item)}
+              canEdit={canEditTags}
+              canCreateTags={canCreateTags}
               onChange={(ids) => onSetTags(item.id, ids)}
               onCreate={onCreateTag}
             />
@@ -639,7 +683,11 @@ export const MainPage = () => {
   /* Auth */
   const auth = useAuth();
   const logout = useLogout();
-  const navigate = useNavigate();
+  const canCreateItem = hasPermission(auth.data, 'CreateItem');
+  const canDeleteItem = hasPermission(auth.data, 'DeleteItem');
+  const canCreateTags = hasPermission(auth.data, 'CreateTag');
+  const canDeleteTags = hasPermission(auth.data, 'DeleteTag');
+  const canEditTags = hasPermission(auth.data, 'ModifyItem');
 
   /* Data */
   const [items, setItems] = useState<TaggedItem[]>([]);
@@ -715,7 +763,7 @@ export const MainPage = () => {
     try {
       const created: TaggedItem = await createItem(item);
       let finalItem = created;
-      if (tagIds.length > 0) {
+      if (canEditTags && tagIds.length > 0) {
         try {
           finalItem = { ...created, Tags: await setItemTags(created.id, tagIds) };
         } catch (e) {
@@ -761,6 +809,7 @@ export const MainPage = () => {
 
   // POST /tags. Tag names are unique (case-insensitive), so an existing match is reused.
   const createTagByName = async (raw: string): Promise<Tag | null> => {
+    if (!canCreateTags) return null;
     const name = raw.trim();
     if (!name) return null;
     const existing = tags.find((t) => t.Name.toLowerCase() === name.toLowerCase());
@@ -778,6 +827,7 @@ export const MainPage = () => {
 
   // DELETE /tags/:id
   const removeTag = async (tag: Tag) => {
+    if (!canDeleteTags) return;
     if (!window.confirm(`Delete the tag "${tag.Name}"? It will be removed from every item.`)) return;
     setError('');
     try {
@@ -792,6 +842,7 @@ export const MainPage = () => {
 
   // PUT /items/:id/tags
   const updateItemTags = async (id: string, tagIds: TagID[]) => {
+    if (!canEditTags) return;
     setError('');
     try {
       const newTags = await setItemTags(id, tagIds);
@@ -843,6 +894,8 @@ export const MainPage = () => {
         counts={tagCounts}
         totalItems={items.length}
         activeIds={activeTagIds}
+        canCreateTags={canCreateTags}
+        canDeleteTags={canDeleteTags}
         onToggleTag={toggleActiveTag}
         onClearTags={() => setActiveTagIds([])}
         onCreate={createTagByName}
@@ -864,20 +917,16 @@ export const MainPage = () => {
           <span className="ml-auto text-sm text-slate-500 shrink-0">
             {visibleItems.length} of {items.length}
           </span>
-          <button
-            onClick={addItem}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500 hover:bg-blue-400 text-sm font-medium text-white transition-colors shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            New item
-          </button>
-          <button
-            onClick={() => navigate('/app/bookings')}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500 hover:bg-blue-400 text-sm font-medium text-white transition-colors shrink-0"
-          >
-            <CalendarClock className="w-4 h-4" />
-            Bookings
-          </button>
+          {canCreateItem && (
+            <button
+              onClick={addItem}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500 hover:bg-blue-400 text-sm font-medium text-white transition-colors shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              New item
+            </button>
+          )}
+          <PageNavigation />
           <button
             onClick={() => logout.mutate()}
             disabled={logout.isPending}
@@ -910,7 +959,7 @@ export const MainPage = () => {
 
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="h-full flex items-center justify-center text-slate-500 text-sm">Loading items…</div>
+            <ListSkeleton label="Loading items" />
           ) : rows.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-500 text-sm">
               <p>{items.length === 0 ? 'No items yet.' : 'No items match your filters.'}</p>
@@ -991,6 +1040,9 @@ export const MainPage = () => {
               key={spotlightItem.id}
               item={spotlightItem}
               isDraft={spotlightItem.id === DRAFT_ID}
+              canDeleteItem={canDeleteItem}
+              canEditTags={canEditTags}
+              canCreateTags={canCreateTags}
               saving={saving}
               allTags={tags}
               onClose={() => selectItem(null)}

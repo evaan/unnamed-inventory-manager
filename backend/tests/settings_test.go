@@ -328,3 +328,42 @@ func getTestSettings(t *testing.T, router http.Handler, token string) map[string
 
 	return values
 }
+
+func TestCreateSetting(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db, auth.PermissionAdministrator)
+
+	response := makeRequest(router, http.MethodPost, "/settings", `{"name":"organisation_name","value":"Maker space"}`, token)
+	requireStatus(t, response, http.StatusCreated)
+	assertJSON(t, response, gin.H{"name": "organisation_name", "value": "Maker space"})
+
+	value, err := settings.Get(db, "organisation_name")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value != "Maker space" {
+		t.Errorf("Expected Maker space, got %q", value)
+	}
+}
+
+func TestCreateSettingInvalidBody(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db, auth.PermissionAdministrator)
+
+	response := makeRequest(router, http.MethodPost, "/settings", `{"name":"test"}`, token)
+	requireStatus(t, response, http.StatusBadRequest)
+	if _, err := settings.Get(db, "test"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("Expected invalid setting not to be created, got %v", err)
+	}
+}
+
+func TestRegularUserCannotCreateSetting(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db)
+
+	response := makeRequest(router, http.MethodPost, "/settings", `{"name":"test","value":"value"}`, token)
+	requireStatus(t, response, http.StatusForbidden)
+	if _, err := settings.Get(db, "test"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("Expected setting not to be created, got %v", err)
+	}
+}

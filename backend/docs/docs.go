@@ -482,6 +482,61 @@ const docTemplate = `{
                     }
                 }
             },
+            "post": {
+                "description": "Create a new named setting with a string value. Existing names are rejected. Admin only, using the session cookie",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Create a setting",
+                "parameters": [
+                    {
+                        "description": "New setting name and string value",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/settings.CreateSettingRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Setting created",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "value": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body, empty name, or missing string value"
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Not an administrator, user disabled, or invalid frontend Origin or Referer"
+                    },
+                    "409": {
+                        "description": "Setting already exists"
+                    },
+                    "500": {
+                        "description": "Error creating setting"
+                    }
+                }
+            },
             "patch": {
                 "description": "Update existing settings by name. Values must be strings; encode lists as JSON strings. Omitted settings are unchanged.\nAll updates are applied together, and unknown names are rejected. Admin only, using the session cookie",
                 "consumes": [
@@ -841,6 +896,17 @@ const docTemplate = `{
                 },
                 "quantity": {
                     "type": "integer"
+                }
+            }
+        },
+        "settings.CreateSettingRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
                 }
             }
         },

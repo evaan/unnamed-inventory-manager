@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, X, Trash2, MapPin, Printer, Wrench } from 'lucide-react';
 import { useAuth, useLogout } from '../features/auth/useAuth';
+import { PageNavigation } from '../components/PageNavigation';
+import { ListSkeleton } from '../components/ListSkeleton';
 import {
   getEquipment,
   getBookings,
@@ -15,11 +17,6 @@ import {
 const OPEN_HOUR = 8; // equipment can be booked from 8:00...
 const CLOSE_HOUR = 20; // ...until 20:00
 const MAX_HOURS = 8; // longest single booking
-
-// TODO: set these to your real routes. Plain <a> links work with any router (they reload the page);
-// swap for your router's <Link> if you want client-side navigation.
-const INVENTORY_PATH = '/app';
-const BOOKINGS_PATH = '/app/bookings';
 
 /* ---------- Date helpers ---------- */
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -88,18 +85,6 @@ const Field = ({
     <span className="block text-xs text-slate-500 mb-1">{label}</span>
     {children}
   </label>
-);
-
-const NavLink = ({ href, active, children }: { href: string; active?: boolean; children: React.ReactNode }) => (
-  <a
-    href={href}
-    aria-current={active ? 'page' : undefined}
-    className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-      active ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-    }`}
-  >
-    {children}
-  </a>
 );
 
 const FilterChip = ({
@@ -498,12 +483,6 @@ export const BookingsPage = () => {
       {/* Main: equipment list */}
       <main className="flex-1 flex flex-col bg-slate-950 overflow-hidden min-w-0">
         <header className="border-b border-slate-800 bg-slate-900/50 px-6 py-3 flex items-center gap-4">
-          <nav className="flex items-center gap-1 shrink-0">
-            <NavLink href={INVENTORY_PATH}>Inventory</NavLink>
-            <NavLink href={BOOKINGS_PATH} active>
-              Equipment
-            </NavLink>
-          </nav>
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -516,6 +495,7 @@ export const BookingsPage = () => {
           <span className="ml-auto text-sm text-slate-500 shrink-0">
             {visible.length} of {equipment.length}
           </span>
+          <PageNavigation />
           <button
             onClick={() => logout.mutate()}
             disabled={logout.isPending}
@@ -554,7 +534,7 @@ export const BookingsPage = () => {
 
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="h-full flex items-center justify-center text-slate-500 text-sm">Loading equipment…</div>
+            <ListSkeleton label="Loading equipment" equipment />
           ) : visible.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-500 text-sm">
               <p>{equipment.length === 0 ? 'No equipment yet.' : 'No equipment matches your filters.'}</p>

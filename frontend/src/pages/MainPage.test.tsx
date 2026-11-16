@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { MainPage } from './MainPage';
 import { useAuth, useLogout } from '../features/auth/useAuth';
 import { getItems, createItem, adjustItem, deleteItem, type Item } from '../features/items/itemsapi';
-import { getTags } from '../features/items/tagsapi';
+import { getTags, createTag, deleteTag, setItemTags } from '../features/items/tagsapi';
 
 // Mock both feature modules so tests never touch the network or the other teams' services.
 vi.mock('../features/auth/useAuth', () => ({
@@ -46,7 +46,7 @@ const ITEMS = [
 
 const logoutMutate = vi.fn();
 
-// MainPage uses useNavigate (Bookings button), so it needs a router around it.
+// MainPage's page selector needs a router around it.
 const renderMain = () =>
   render(
     <MemoryRouter>
@@ -57,7 +57,7 @@ const renderMain = () =>
 const renderPage = async (items = ITEMS) => {
   vi.mocked(getItems).mockResolvedValue(items);
   renderMain();
-  await waitFor(() => expect(screen.queryByText(/loading items/i)).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.queryByRole('status', { name: 'Loading items' })).not.toBeInTheDocument());
 };
 
 beforeEach(() => {
@@ -68,18 +68,18 @@ beforeEach(() => {
 });
 
 describe('MainPage: auth gate', () => {
-  it('renders nothing when the user is not logged in', () => {
+  it('renders nothing when the user is not logged in', async () => {
     vi.mocked(useAuth).mockReturnValue({ data: { loggedIn: false } } as never);
     vi.mocked(getItems).mockResolvedValue([]);
     const { container } = renderMain();
-    expect(container).toBeEmptyDOMElement();
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 
-  it('renders nothing when the account is disabled', () => {
+  it('renders nothing when the account is disabled', async () => {
     vi.mocked(useAuth).mockReturnValue({ data: { loggedIn: true, disabled: true } } as never);
     vi.mocked(getItems).mockResolvedValue([]);
     const { container } = renderMain();
-    expect(container).toBeEmptyDOMElement();
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 
   it('calls logout.mutate when "Log out" is clicked', async () => {
@@ -96,14 +96,16 @@ describe('MainPage: auth gate', () => {
 });
 
 describe('MainPage: loading and listing', () => {
-  it('shows a loading message, then the items', async () => {
+  it('shows skeleton rows while loading, then the items', async () => {
     vi.mocked(getItems).mockResolvedValue(ITEMS);
     renderMain();
-    expect(screen.getByText(/loading items/i)).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading items' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByText('No items yet.')).not.toBeInTheDocument();
     expect(await screen.findByText('Resistor 4.7k')).toBeInTheDocument();
     expect(screen.getByText('Capacitor 10uF')).toBeInTheDocument();
     expect(screen.getByText('LED Red')).toBeInTheDocument();
     expect(screen.getByText('3 of 3')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading items' })).not.toBeInTheDocument();
   });
 
   it('derives stock status from quantity (>10, 1-10, 0)', async () => {
@@ -135,6 +137,7 @@ describe('MainPage: loading and listing', () => {
     await userEvent.click(screen.getByTitle('Dismiss'));
     expect(screen.queryByText('Network down')).not.toBeInTheDocument();
   });
+
 });
 
 describe('MainPage: search', () => {
@@ -243,6 +246,22 @@ describe('MainPage: adjust quantity', () => {
 });
 
 describe('MainPage: delete', () => {
+  beforeEach(() => {
+    vi.mocked(useAuth).mockReturnValue({
+      data: { loggedIn: true, disabled: false, permissions: ['DeleteItem'] },
+    } as never);
+  });
+
+  it('hides Delete item without DeleteItem permission', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      data: { loggedIn: true, disabled: false, permissions: ['CreateItem', 'ModifyItem'] },
+    } as never);
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /led red/i }));
+    expect(screen.queryByTitle('Delete item')).not.toBeInTheDocument();
+    expect(deleteItem).not.toHaveBeenCalled();
+  });
+
   it('deletes the item after the user confirms', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(deleteItem).mockResolvedValue(undefined as never);
@@ -278,6 +297,30 @@ describe('MainPage: delete', () => {
 });
 
 describe('MainPage: new item', () => {
+  beforeEach(() => {
+    vi.mocked(useAuth).mockReturnValue({
+      data: { loggedIn: true, disabled: false, permissions: ['CreateItem'] },
+    } as never);
+  });
+
+  it('allows administrators to create and delete items', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      data: { loggedIn: true, disabled: false, permissions: ['Administrator'] },
+    } as never);
+    await renderPage();
+    expect(screen.getByRole('button', { name: /new item/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /led red/i }));
+    expect(screen.getByTitle('Delete item')).toBeInTheDocument();
+  });
+
+  it('hides New item without CreateItem permission', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      data: { loggedIn: true, disabled: false, permissions: ['ModifyItem', 'DeleteItem'] },
+    } as never);
+    await renderPage();
+    expect(screen.queryByRole('button', { name: /new item/i })).not.toBeInTheDocument();
+  });
+
   it('opens a draft form with a Draft row', async () => {
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
@@ -366,4 +409,74 @@ describe('MainPage: new item', () => {
     expect(await screen.findByText('Create failed')).toBeInTheDocument();
     expect(screen.getByText('Draft')).toBeInTheDocument();
   });
+});
+
+describe('MainPage: tag permissions', () => {
+  const resistorTag = { ID: 'tag-1', Name: 'Resistors' };
+  const sensorTag = { ID: 'tag-2', Name: 'Sensors' };
+  const taggedItem = makeItem({ Tags: [resistorTag] });
+
+  const setPermissions = (permissions?: string[]) => {
+    vi.mocked(useAuth).mockReturnValue({
+      data: { loggedIn: true, disabled: false, permissions },
+    } as never);
+  };
+
+  const openItem = async () => {
+    await renderPage([taggedItem]);
+    await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
+  };
+
+  beforeEach(() => {
+    vi.mocked(getTags).mockResolvedValue([resistorTag, sensorTag]);
+  });
+
+  it('keeps tags read-only without permissions but still allows filtering', async () => {
+    setPermissions([]);
+    await openItem();
+
+    expect(screen.queryByPlaceholderText('New tag')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete tag Resistors' })).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Add a tag…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove tag Resistors' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Sensors/ }));
+    expect(screen.getByText('No items match your filters.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(screen.getByRole('heading', { name: taggedItem.itemName })).toBeInTheDocument();
+    expect(createTag).not.toHaveBeenCalled();
+    expect(deleteTag).not.toHaveBeenCalled();
+    expect(setItemTags).not.toHaveBeenCalled();
+  });
+
+  it('creates a tag with CreateTag permission', async () => {
+    setPermissions(['CreateTag']);
+    vi.mocked(createTag).mockResolvedValue({ ID: 'tag-3', Name: 'Power' });
+    await renderPage();
+    await userEvent.type(screen.getByPlaceholderText('New tag'), 'Power');
+    await userEvent.click(screen.getByTitle('Create tag'));
+    expect(createTag).toHaveBeenCalledWith('Power');
+    expect(await screen.findByRole('button', { name: /^Power/ })).toBeInTheDocument();
+  });
+
+  it('deletes a global tag with DeleteTag permission', async () => {
+    setPermissions(['DeleteTag']);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(deleteTag).mockResolvedValue(undefined);
+    await openItem();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete tag Resistors' }));
+    expect(deleteTag).toHaveBeenCalledWith(resistorTag.ID);
+    await waitFor(() => expect(screen.queryByText('Resistors')).not.toBeInTheDocument());
+    expect(setItemTags).not.toHaveBeenCalled();
+  });
+
+  it('assigns an existing tag with ModifyItem permission', async () => {
+    setPermissions(['ModifyItem']);
+    vi.mocked(setItemTags).mockResolvedValue([resistorTag, sensorTag]);
+    await openItem();
+    await userEvent.type(screen.getByPlaceholderText('Add a tag…'), 'Sensors');
+    await userEvent.click(screen.getByRole('button', { name: 'Sensors' }));
+    expect(setItemTags).toHaveBeenCalledWith(taggedItem.id, [resistorTag.ID, sensorTag.ID]);
+    expect(createTag).not.toHaveBeenCalled();
+  });
+
 });

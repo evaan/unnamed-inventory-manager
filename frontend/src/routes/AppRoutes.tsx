@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from '../pages/LoginPage';
 import { MainPage } from '../pages/MainPage';
-import { AccountPage } from '../pages/AccountPage';
+import { SettingsPage } from '../pages/SettingsPage';
 import { BookingsPage } from '../pages/BookingsPage';
 import { DisabledPage } from '../pages/DisabledPage';
 import AppLayout from '../layout/AppLayout';
@@ -51,7 +51,8 @@ function SessionRoutes() {
         element={loggedIn && !disabled ? <AppLayout /> : <Navigate to={destination} replace />}
       >
         <Route index element={<MainPage />} />
-        <Route path="account" element={<AccountPage />} />
+        <Route path="account" element={<Navigate to="/app/settings" replace />} />
+        <Route path="settings/*" element={<SettingsPage />} />
         <Route path="bookings" element={<BookingsPage />} />
       </Route>
 

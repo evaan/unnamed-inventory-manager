@@ -29,6 +29,16 @@ func DeleteItem(c *gin.Context, db *gorm.DB) {
 		return
 	}
 
+	hasPermission, err := auth.HasPermission(db.WithContext(c.Request.Context()), user, auth.PermissionDeleteItem)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	if !hasPermission {
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+
 	id := c.Param("id")
 
 	if id == "" {
