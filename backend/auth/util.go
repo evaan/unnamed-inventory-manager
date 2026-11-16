@@ -24,15 +24,20 @@ func GetUser(c *gin.Context) (*User, error) {
 }
 
 func IsAdmin(db *gorm.DB, user *User) (bool, error) {
-	var isAdmin bool
+	return HasPermission(db, user, PermissionAdministrator)
+}
+
+// HasPermission allows enabled users with the requested permission or Administrator.
+func HasPermission(db *gorm.DB, user *User, permission string) (bool, error) {
+	var hasPermission bool
 
 	err := db.Model(&UserPermission{}).
 		Joins("JOIN users ON users.id = user_permissions.user_id").
 		Select("COUNT(*) > 0").
-		Where("user_permissions.user_id = ? AND permission = ? AND users.disabled = ?", user.ID, PermissionAdministrator, false).
-		Scan(&isAdmin).Error
+		Where("user_permissions.user_id = ? AND permission IN ? AND users.disabled = ?", user.ID, []string{permission, PermissionAdministrator}, false).
+		Scan(&hasPermission).Error
 
-	return isAdmin, err
+	return hasPermission, err
 }
 
 func DoesUserExist(db *gorm.DB, userID string) (bool, error) {

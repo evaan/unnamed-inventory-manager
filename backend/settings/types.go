@@ -6,3 +6,8 @@ type Setting struct {
 }
 
 type PatchSettingsRequest map[string]*string
+
+type CreateSettingRequest struct {
+	Name  string  `json:"name"`
+	Value *string `json:"value"`
+}
