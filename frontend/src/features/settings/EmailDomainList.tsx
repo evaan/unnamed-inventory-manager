@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
-import { BUTTON, INPUT } from './styles';
+import { BUTTON, INPUT } from '../../components/styles';
 
 const parseDomains = (value: string): string[] | null => {
   try {
@@ -65,7 +65,7 @@ export const EmailDomainList = ({ id, value, onChange }: {
                   onChange(JSON.stringify(domains.filter((_, position) => position !== index)));
                   setError('');
                 }}
-                className="shrink-0 rounded-lg p-1 text-slate-500 hover:bg-slate-800 hover:text-rose-300 disabled:opacity-40"
+                className="ui-icon-button hover:!text-rose-300"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>

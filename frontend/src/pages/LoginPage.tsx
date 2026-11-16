@@ -1,18 +1,17 @@
 import ParticlesBG from '../components/ParticlesBG';
+import { AuthPageShell } from '../components/AuthPageShell';
 
 export const LoginPage = () => {
   return (
-    <div className="relative isolate flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-800 p-4">
-      <ParticlesBG />
-
-      <div className="relative z-10 flex w-full max-w-md flex-col items-center justify-center rounded-2xl border border-slate-300 bg-slate-200 p-8 shadow-2xl">
+    <AuthPageShell background={<ParticlesBG />}>
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-slate-900">Welcome</h1>
-          <p className="mt-1 text-sm text-slate-600">Sign in to manage your inventory</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Welcome</h1>
+          <p className="mt-2 text-sm text-slate-400">Sign in to manage your inventory</p>
         </div>
 
         <button
-          onClick={() => window.location.assign(`${import.meta.env.VITE_API_URL}/login`)} className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-500"
+          onClick={() => window.location.assign(`${import.meta.env.VITE_API_URL}/login`)}
+          className="ui-button-secondary w-full gap-3 py-3"
         >
           <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
             <path
@@ -34,7 +33,6 @@ export const LoginPage = () => {
           </svg>
           Continue with Google
         </button>
-      </div>
-    </div>
+    </AuthPageShell>
   );
 };

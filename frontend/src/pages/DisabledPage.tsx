@@ -1,24 +1,27 @@
 import { useLogout } from '../features/auth/useAuth';
+import { AuthPageShell } from '../components/AuthPageShell';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export const DisabledPage = () => {
   const logout = useLogout();
 
   return (
-    <div className="min-h-screen bg-slate-800 flex items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-2xl bg-slate-200 p-8 text-center shadow-2xl">
-        <h1 className="text-2xl font-bold text-slate-900">Account disabled</h1>
-        <p className="mt-3 text-slate-600">
-          Your account has been disabled. Please contact an administrator.
-        </p>
-        {logout.error && <p role="alert" className="mt-3 text-red-700">{logout.error.message}</p>}
+    <AuthPageShell>
+      <h1 className="text-2xl font-semibold tracking-tight">Account disabled</h1>
+      <p className="mt-3 text-sm text-slate-400">
+        Your account has been disabled. Please contact an administrator.
+      </p>
+      {logout.error && <p role="alert" className="mt-3 text-sm text-rose-300">{logout.error.message}</p>}
+      <div className="mt-6 flex items-center justify-center gap-2">
+        <ThemeToggle />
         <button
           onClick={() => logout.mutate()}
           disabled={logout.isPending}
-          className="mt-6 rounded bg-slate-800 px-4 py-2 text-white disabled:opacity-50"
+          className="ui-button-secondary"
         >
-          {logout.isPending ? 'Logging out…' : 'Log Out'}
+          {logout.isPending ? 'Logging out…' : 'Log out'}
         </button>
       </div>
-    </div>
+    </AuthPageShell>
   );
 };

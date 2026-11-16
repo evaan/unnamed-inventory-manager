@@ -1,0 +1,119 @@
+import { useEffect, useState, type ReactNode } from 'react';
+import { Pencil, Trash2, Truck, X } from 'lucide-react';
+import { ErrorBanner } from '../../components/ErrorBanner';
+import { ItemForm } from './ItemForm';
+import type { Item, NewItem } from './itemsapi';
+import type { TagID } from './tagsapi';
+import { getStock, STOCK_STYLES } from './itemStock';
+
+const Detail = ({ label, children }: { label: string; children: ReactNode }) => (
+  <div>
+    <p className="mb-0.5 text-xs text-slate-500">{label}</p>
+    <div className="break-words text-sm">{children}</div>
+  </div>
+);
+
+const ExternalLinkText = ({ url, text }: { url: string; text: string }) => {
+  // Older records may predate URL validation.
+  try {
+    if (!['http:', 'https:'].includes(new URL(url).protocol)) return null;
+  } catch {
+    return null;
+  }
+  return <a href={url} target="_blank" rel="noopener noreferrer" className="text-slate-200 hover:text-white hover:underline underline-offset-2">{text}</a>;
+};
+
+export const ItemDetails = ({
+  item, isDraft, editing, canModify, canDelete, saving, adjusting, error, tags, draftTags,
+  onDirtyChange, onSave, onEdit, onClose, onCancel, onAdjust, onDelete, onDismissError,
+}: {
+  item: Item;
+  isDraft: boolean;
+  editing: boolean;
+  canModify: boolean;
+  canDelete: boolean;
+  saving: boolean;
+  adjusting: boolean;
+  error: string;
+  tags: ReactNode;
+  draftTags: (ids: TagID[], onChange: (ids: TagID[]) => void) => ReactNode;
+  onDirtyChange: (dirty: boolean) => void;
+  onSave: (item: NewItem, tagIds: TagID[]) => void;
+  onEdit: () => void;
+  onClose: () => void;
+  onCancel: () => void;
+  onAdjust: (id: string, delta: number) => void;
+  onDelete: (id: string) => void;
+  onDismissError: () => void;
+}) => {
+  const [tagIds, setTagIds] = useState<TagID[]>([]);
+  const [formDirty, setFormDirty] = useState(false);
+  useEffect(() => {
+    onDirtyChange(formDirty || (isDraft && tagIds.length > 0));
+  }, [formDirty, isDraft, tagIds, onDirtyChange]);
+  const stock = getStock(item);
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-start justify-between gap-3 border-b border-slate-800 px-5 pt-4 pb-3">
+        <div className="min-w-0">
+          <h2 className="break-words text-base font-semibold leading-snug">{isDraft ? 'New item' : editing ? `Edit ${item.itemName}` : item.itemName}</h2>
+          {!isDraft && <p className="mt-1 break-words font-mono text-xs text-slate-400">{item.manufacturerPart}</p>}
+        </div>
+        <div className="-mr-1.5 flex shrink-0 items-center gap-1">
+          {!isDraft && !editing && canModify && (
+            <button onClick={onEdit} disabled={adjusting} aria-label="Edit item" title="Edit item" className="ui-icon-button"><Pencil className="h-4 w-4" /></button>
+          )}
+          {!isDraft && !editing && canDelete && (
+            <button onClick={() => { if (window.confirm(`Delete "${item.itemName}"? This can't be undone.`)) onDelete(item.id); }} disabled={saving || adjusting} aria-label="Delete item" title="Delete item" className="ui-icon-button hover:!text-rose-300"><Trash2 className="h-4 w-4" /></button>
+          )}
+          <button onClick={onClose} disabled={saving} aria-label={isDraft ? 'Cancel new item' : 'Close item details'} title={isDraft ? 'Cancel (Esc)' : 'Close (Esc)'} className="ui-icon-button"><X className="h-4 w-4" /></button>
+        </div>
+      </div>
+      {error && <ErrorBanner message={error} onDismiss={onDismissError} />}
+      {isDraft || editing ? (
+        <ItemForm
+          item={item}
+          editing={editing}
+          saving={saving}
+          onDirtyChange={setFormDirty}
+          onSave={(values) => onSave(values, tagIds)}
+          onCancel={onCancel}
+        >
+          {isDraft && <section><p className="mb-1 text-xs text-slate-500">Tags</p>{draftTags(tagIds, setTagIds)}</section>}
+        </ItemForm>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+          <section>
+            <div className="flex items-baseline justify-between">
+              <p className="text-2xl font-semibold tabular-nums" aria-label={`Quantity: ${item.quantity.toLocaleString()}`}>{item.quantity.toLocaleString()}</p>
+              <span className={STOCK_STYLES[stock]}>{stock}</span>
+            </div>
+            {canModify && (
+              <div className="mt-3 grid grid-cols-4 gap-2" aria-busy={adjusting}>
+                {[-10, -1, 1, 10].map((delta) => (
+                  <button key={delta} onClick={() => onAdjust(item.id, delta)} disabled={adjusting || (delta < 0 && item.quantity < Math.abs(delta))} className="ui-button-secondary tabular-nums">
+                    {delta > 0 ? `+${delta}` : delta}
+                  </button>
+                ))}
+              </div>
+            )}
+            {adjusting && <p role="status" className="mt-2 text-xs text-slate-400">Updating quantity…</p>}
+          </section>
+          <section><p className="mb-1.5 text-xs text-slate-500">Tags</p>{tags}</section>
+          <section className="space-y-4">
+            {item.manufacturer && <Detail label="Manufacturer"><span className="flex items-center gap-2"><Truck className="h-4 w-4 shrink-0 text-slate-500" />{item.manufacturer}</span></Detail>}
+            {item.distributorPart && <Detail label="Distributor part #"><span className="font-mono text-xs">{item.distributorPart}</span></Detail>}
+            {item.description && <Detail label="Description">{item.description}</Detail>}
+            {(item.distributorURL || item.dataSheetURL) && (
+              <Detail label="Links"><div className="flex flex-col gap-1">
+                {item.distributorURL && <ExternalLinkText url={item.distributorURL} text="Distributor page" />}
+                {item.dataSheetURL && <ExternalLinkText url={item.dataSheetURL} text="Data sheet" />}
+              </div></Detail>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+};

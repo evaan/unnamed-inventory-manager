@@ -2,9 +2,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MainPage } from './MainPage';
 import { useAuth, useLogout } from '../features/auth/useAuth';
-import { getItems, createItem, adjustItem, deleteItem, type Item } from '../features/items/itemsapi';
+import { getItems, createItem, adjustItem, deleteItem, updateItem, type Item } from '../features/items/itemsapi';
 import { getTags, createTag, deleteTag, setItemTags } from '../features/items/tagsapi';
 
 // Mock both feature modules so tests never touch the network or the other teams' services.
@@ -17,6 +18,7 @@ vi.mock('../features/items/itemsapi', () => ({
   createItem: vi.fn(),
   adjustItem: vi.fn(),
   deleteItem: vi.fn(),
+  updateItem: vi.fn(),
 }));
 vi.mock('../features/items/tagsapi', () => ({
   getTags: vi.fn(),
@@ -49,9 +51,11 @@ const logoutMutate = vi.fn();
 // MainPage's page selector needs a router around it.
 const renderMain = () =>
   render(
-    <MemoryRouter>
-      <MainPage />
-    </MemoryRouter>
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <MainPage />
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 
 const renderPage = async (items = ITEMS) => {
@@ -73,6 +77,8 @@ describe('MainPage: auth gate', () => {
     vi.mocked(getItems).mockResolvedValue([]);
     const { container } = renderMain();
     await waitFor(() => expect(container).toBeEmptyDOMElement());
+    expect(getItems).not.toHaveBeenCalled();
+    expect(getTags).not.toHaveBeenCalled();
   });
 
   it('renders nothing when the account is disabled', async () => {
@@ -96,6 +102,36 @@ describe('MainPage: auth gate', () => {
 });
 
 describe('MainPage: loading and listing', () => {
+  it('shows quantities directly in inventory rows', async () => {
+    await renderPage();
+    expect(screen.getByLabelText('Quantity: 50', { selector: 'span' })).toBeVisible();
+    expect(screen.getByLabelText('Quantity: 0', { selector: 'span' })).toBeVisible();
+  });
+
+  it('can retry a failed inventory load without reloading the page', async () => {
+    vi.mocked(getItems).mockRejectedValueOnce(new Error('Network down')).mockResolvedValue(ITEMS);
+    renderMain();
+    expect(await screen.findByText('Network down')).toBeInTheDocument();
+    expect(screen.queryByText('No items yet.')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('Resistor 4.7k')).toBeInTheDocument();
+    expect(screen.queryByText('Network down')).not.toBeInTheDocument();
+  });
+
+  it('starts with tags collapsed on narrow screens', async () => {
+    vi.stubGlobal('innerWidth', 375);
+    try {
+      await renderPage();
+      const toggle = screen.getByRole('button', { name: 'Expand tags' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('button', { name: /^Tags$/ })).not.toBeInTheDocument();
+      await userEvent.click(toggle);
+      expect(screen.getByRole('button', { name: 'Collapse tags' })).toHaveAttribute('aria-expanded', 'true');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('shows skeleton rows while loading, then the items', async () => {
     vi.mocked(getItems).mockResolvedValue(ITEMS);
     renderMain();
@@ -209,6 +245,33 @@ describe('MainPage: spotlight panel', () => {
 });
 
 describe('MainPage: adjust quantity', () => {
+  beforeEach(() => {
+    vi.mocked(useAuth).mockReturnValue({
+      data: { loggedIn: true, disabled: false, permissions: ['ModifyItem'] },
+    } as never);
+  });
+  it('keeps stock controls and editing hidden without ModifyItem permission', async () => {
+    vi.mocked(useAuth).mockReturnValue({ data: { loggedIn: true, disabled: false, permissions: [] } } as never);
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
+    expect(screen.queryByRole('button', { name: '+1' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit item' })).not.toBeInTheDocument();
+    expect(adjustItem).not.toHaveBeenCalled();
+  });
+
+  it('locks adjustments until the request completes', async () => {
+    let resolve!: (item: Item) => void;
+    vi.mocked(adjustItem).mockReturnValue(new Promise((done) => { resolve = done; }));
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
+    await userEvent.click(screen.getByRole('button', { name: '+1' }));
+    for (const name of ['-10', '-1', '+1', '+10']) expect(screen.getByRole('button', { name })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: '+1' }));
+    expect(adjustItem).toHaveBeenCalledTimes(1);
+    resolve(makeItem({ quantity: 51 }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '+1' })).toBeEnabled());
+    expect(screen.getByLabelText('Quantity: 51', { selector: 'span' })).toBeVisible();
+  });
   it('sends ADDED with the amount when +1 is clicked and updates the item', async () => {
     vi.mocked(adjustItem).mockResolvedValue(makeItem({ id: '2', itemName: 'Capacitor 10uF', quantity: 6 }));
     await renderPage();
@@ -216,7 +279,7 @@ describe('MainPage: adjust quantity', () => {
     await userEvent.click(screen.getByRole('button', { name: '+1' }));
 
     expect(adjustItem).toHaveBeenCalledWith('2', 'ADDED', 1);
-    expect(await screen.findByText('6')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Quantity: 6', { selector: 'p' })).toBeInTheDocument();
   });
 
   it('sends TAKEN with a positive amount when -1 is clicked', async () => {
@@ -303,6 +366,98 @@ describe('MainPage: new item', () => {
     } as never);
   });
 
+  it.each(['', '1.5', '2147483648'])('rejects invalid quantity %j', async (quantity) => {
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /new item/i }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Widget');
+    await userEvent.type(screen.getByLabelText('Manufacturer'), 'TDK');
+    await userEvent.type(screen.getByLabelText('Manufacturer Part #'), 'TDK-12');
+    await userEvent.clear(screen.getByLabelText('Quantity'));
+    if (quantity) await userEvent.type(screen.getByLabelText('Quantity'), quantity);
+    await userEvent.click(screen.getByRole('button', { name: /add item/i }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Quantity must be a whole number');
+    expect(createItem).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe URLs', async () => {
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /new item/i }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Widget');
+    await userEvent.type(screen.getByLabelText('Manufacturer'), 'TDK');
+    await userEvent.type(screen.getByLabelText('Manufacturer Part #'), 'TDK-12');
+    await userEvent.type(screen.getByLabelText('Distributor URL'), 'javascript:alert(1)');
+    await userEvent.click(screen.getByRole('button', { name: /add item/i }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a valid http:// or https:// URL.');
+    expect(createItem).not.toHaveBeenCalled();
+  });
+
+  it.each(['cancel', 'escape', 'row', 'new', 'navigation', 'logout'])('keeps unsaved values when declining to discard via %s', async (action) => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /new item/i }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Unsaved widget');
+    if (action === 'cancel') await userEvent.click(screen.getByRole('button', { name: /^Cancel$/ }));
+    if (action === 'escape') await userEvent.keyboard('{Escape}');
+    if (action === 'row') await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
+    if (action === 'new') await userEvent.click(screen.getByRole('button', { name: /^new item$/i }));
+    if (action === 'navigation') await userEvent.click(screen.getByRole('link', { name: 'Bookings' }));
+    if (action === 'logout') await userEvent.click(screen.getByRole('button', { name: /log out/i }));
+    expect(confirm).toHaveBeenCalledWith('Discard your unsaved changes?');
+    expect(screen.getByLabelText('Name')).toHaveValue('Unsaved widget');
+    expect(logoutMutate).not.toHaveBeenCalled();
+  });
+
+  it('discards a dirty draft only after confirmation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /new item/i }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Unsaved widget');
+    await userEvent.keyboard('{Escape}');
+    expect(confirm).toHaveBeenCalledWith('Discard your unsaved changes?');
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument();
+  });
+
+  it('starts a fresh draft after confirming New item again', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /^New item$/ }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Old draft');
+    await userEvent.click(screen.getByRole('button', { name: /^New item$/ }));
+    expect(screen.getByLabelText('Name')).toHaveValue('');
+  });
+
+  it('warns before unloading with changes and removes the warning after discard', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /^New item$/ }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Unsaved');
+    const dirtyUnload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(dirtyUnload);
+    expect(dirtyUnload.defaultPrevented).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: /^Cancel$/ }));
+    const cleanUnload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(cleanUnload);
+    expect(cleanUnload.defaultPrevented).toBe(false);
+  });
+
+  it('prevents closing or duplicate submissions during save', async () => {
+    let resolve!: (item: Item) => void;
+    vi.mocked(createItem).mockReturnValue(new Promise((done) => { resolve = done; }));
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /new item/i }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Widget');
+    await userEvent.type(screen.getByLabelText('Manufacturer'), 'TDK');
+    await userEvent.type(screen.getByLabelText('Manufacturer Part #'), 'TDK-12');
+    await userEvent.click(screen.getByRole('button', { name: /add item/i }));
+    expect(screen.getByRole('button', { name: 'Adding…' })).toBeDisabled();
+    expect(screen.getByLabelText('Name')).toBeDisabled();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByText('Draft')).toBeInTheDocument();
+    expect(createItem).toHaveBeenCalledTimes(1);
+    resolve(makeItem({ id: '99', itemName: 'Widget' }));
+    expect(await screen.findByRole('heading', { name: 'Widget' })).toBeInTheDocument();
+  });
+
   it('allows administrators to create and delete items', async () => {
     vi.mocked(useAuth).mockReturnValue({
       data: { loggedIn: true, disabled: false, permissions: ['Administrator'] },
@@ -347,14 +502,14 @@ describe('MainPage: new item', () => {
     expect(screen.queryByText('Name, manufacturer and manufacturer part # are required.')).not.toBeInTheDocument();
   });
 
-  it('saves trimmed values with a sanitised integer quantity, then lists the new item', async () => {
+  it('saves trimmed values with an integer quantity, then lists the new item', async () => {
     vi.mocked(createItem).mockImplementation(async (item) => makeItem({ ...item, id: '99' }));
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
 
     await userEvent.type(screen.getByLabelText('Name'), '  Inductor  ');
     await userEvent.clear(screen.getByLabelText('Quantity'));
-    await userEvent.type(screen.getByLabelText('Quantity'), '12.7');
+    await userEvent.type(screen.getByLabelText('Quantity'), '12');
     await userEvent.type(screen.getByLabelText('Manufacturer'), ' TDK ');
     await userEvent.type(screen.getByLabelText('Manufacturer Part #'), ' TDK-12 ');
     await userEvent.click(screen.getByRole('button', { name: /add item/i }));
@@ -367,7 +522,7 @@ describe('MainPage: new item', () => {
     expect(screen.getByText('4 of 4')).toBeInTheDocument();
   });
 
-  it('clamps negative or non-numeric quantities to 0', async () => {
+  it('rejects negative quantities instead of silently changing them', async () => {
     vi.mocked(createItem).mockImplementation(async (item) => makeItem({ ...item, id: '99' }));
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
@@ -378,7 +533,8 @@ describe('MainPage: new item', () => {
     await userEvent.type(screen.getByLabelText('Quantity'), '-5');
     await userEvent.click(screen.getByRole('button', { name: /add item/i }));
 
-    expect(createItem).toHaveBeenCalledWith(expect.objectContaining({ quantity: 0 }));
+    expect(createItem).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Quantity must be a whole number');
   });
 
   it('discards the draft with Cancel', async () => {
@@ -408,6 +564,59 @@ describe('MainPage: new item', () => {
 
     expect(await screen.findByText('Create failed')).toBeInTheDocument();
     expect(screen.getByText('Draft')).toBeInTheDocument();
+  });
+});
+
+describe('MainPage: editing item details', () => {
+  beforeEach(() => {
+    vi.mocked(useAuth).mockReturnValue({ data: { loggedIn: true, disabled: false, permissions: ['ModifyItem'] } } as never);
+  });
+
+  const openEdit = async () => {
+    await renderPage();
+    await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Edit item' }));
+  };
+
+  it('prefills details and saves metadata without overwriting quantity', async () => {
+    vi.mocked(updateItem).mockResolvedValue(makeItem({ itemName: 'Precision resistor', description: 'Updated description', quantity: 60 }));
+    await openEdit();
+    expect(screen.getByLabelText('Name')).toHaveValue('Resistor 4.7k');
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+    await userEvent.clear(screen.getByLabelText('Name'));
+    await userEvent.type(screen.getByLabelText('Name'), ' Precision resistor ');
+    await userEvent.clear(screen.getByLabelText('Description'));
+    await userEvent.type(screen.getByLabelText('Description'), 'Updated description');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(updateItem).toHaveBeenCalledWith('1', expect.objectContaining({
+      itemName: 'Precision resistor', itemDescription: 'Updated description',
+    }));
+    expect(vi.mocked(updateItem).mock.calls[0][1]).not.toHaveProperty('quantity');
+    expect(vi.mocked(updateItem).mock.calls[0][1]).not.toHaveProperty('description');
+    expect(await screen.findByRole('heading', { name: 'Precision resistor' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Quantity: 60', { selector: 'span' })).toBeVisible();
+  });
+
+  it('keeps failed edits available for retry', async () => {
+    vi.mocked(updateItem).mockRejectedValue(new Error('Save failed'));
+    await openEdit();
+    await userEvent.clear(screen.getByLabelText('Name'));
+    await userEvent.type(screen.getByLabelText('Name'), 'Changed name');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Save failed');
+    expect(screen.getByLabelText('Name')).toHaveValue('Changed name');
+  });
+
+  it('asks before abandoning edits and restores read-only details after confirmation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await openEdit();
+    await userEvent.type(screen.getByLabelText('Name'), ' changed');
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByLabelText('Name')).toHaveValue('Resistor 4.7k changed');
+    confirm.mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: /^Cancel$/ }));
+    expect(screen.getByRole('heading', { name: 'Resistor 4.7k' })).toBeInTheDocument();
+    expect(updateItem).not.toHaveBeenCalled();
   });
 });
 

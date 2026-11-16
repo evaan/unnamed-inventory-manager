@@ -4,7 +4,7 @@ import { NavLink } from 'react-router-dom';
 export const PageNavigation = () => (
   <nav
     aria-label="Main navigation"
-    className="inline-flex items-center gap-1 shrink-0 rounded-xl border border-slate-700 bg-slate-950 p-1 shadow-inner"
+    className="flex w-full items-center gap-6 sm:w-auto sm:gap-8"
   >
     {[
       { to: '/app', label: 'Inventory', icon: Package },
@@ -16,10 +16,10 @@ export const PageNavigation = () => (
         to={to}
         end={to !== '/app/settings'}
         className={({ isActive }) =>
-          `flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
-            isActive
-              ? 'bg-blue-500 text-white shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+          `flex flex-1 items-center justify-center gap-2 border-b-2 px-1.5 py-2 text-sm font-medium transition-colors sm:flex-none ${
+             isActive
+               ? 'border-white text-white'
+               : 'border-transparent text-slate-400 hover:border-slate-600 hover:text-slate-200'
           }`
         }
       >
