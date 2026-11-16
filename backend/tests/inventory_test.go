@@ -550,4 +550,107 @@ func TestAttachInvalidCategory(t *testing.T) {
 
 	// Ensure HTTP response is correct
 	requireStatus(t, response, http.StatusBadRequest)
+
+	var result struct {
+		Error string `json:"error"`
+	}
+
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatalf("Can't decode item created: %v", err)
+	}
+
+	if result.Error != "Adding tag that wasn't found in the database" {
+		t.Fatalf("Incorrect error message, Expected (Adding tag that wasn't found in the database) | Actual response error message: %s", result.Error)
+	}
+}
+
+func TestNoNewFieldsItem(t *testing.T) {
+
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db, "View", "Edit")
+
+	testCategory1 := inventory.ItemCategory{
+		ID:           uuid.New(),
+		CategoryName: "testCategory1",
+	}
+
+	if err := db.Create(&testCategory1).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	testCategory2 := inventory.ItemCategory{
+		ID:           uuid.New(),
+		CategoryName: "testCategory2",
+	}
+
+	if err := db.Create(&testCategory2).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	testItemToEdit := inventory.Item{
+		ID:               uuid.New(),
+		ItemName:         "TestItem1",
+		Quantity:         1,
+		Manufacturer:     "TestCompany",
+		ManufacturerPart: "A1",
+		Categories:       []inventory.ItemCategory{testCategory1, testCategory2},
+	}
+
+	if err := db.Create(&testItemToEdit).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	// Body is empty
+	body := `{
+	}`
+
+	response := makeRequest(router, http.MethodPut, "/items/"+testItemToEdit.ID.String(), body, token)
+
+	// Ensure HTTP response is correct
+	requireStatus(t, response, http.StatusBadRequest)
+
+	var result struct {
+		Error string `json:"error"`
+	}
+
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatalf("Can't decode item created: %v", err)
+	}
+
+	if result.Error != "No item fields provided for update" {
+		t.Fatalf("Incorrect error message, Expected (No item fields provided for update) | Actual response error message: %s", result.Error)
+	}
+
+	var unEditedItem inventory.Item
+
+	// Ensure Item was successfully added to the database
+	if err := db.Preload("Categories").First(&unEditedItem, "id = ?", testItemToEdit.ID).Error; err != nil {
+		t.Fatalf("Created item wasn't found in the database: %v", err)
+	}
+
+	// Ensure the categories are correct
+	if !slices.ContainsFunc(unEditedItem.Categories, func(category inventory.ItemCategory) bool {
+		return category.ID == testCategory1.ID
+	}) {
+		t.Errorf("Couldn't find testCategory1 ID")
+	}
+	if !slices.ContainsFunc(unEditedItem.Categories, func(category inventory.ItemCategory) bool {
+		return category.ID == testCategory2.ID
+	}) {
+		t.Errorf("Couldn't find testCategory2 ID")
+	}
+
+	// Ensure the other properties of the item haven't been modified
+	if unEditedItem.ItemName != "TestItem1" {
+		t.Errorf("Expected Name: TestItem1 | Actual Value: %q", unEditedItem.ItemName)
+	}
+	if unEditedItem.Quantity != 1 {
+		t.Errorf("Expected Quantity: 1 | Actual Value: %d", unEditedItem.Quantity)
+	}
+	if unEditedItem.Manufacturer != "TestCompany" {
+		t.Errorf("Expected Manufacturer: TestCompany | Actual Value: %q", unEditedItem.Manufacturer)
+	}
+	if unEditedItem.ManufacturerPart != "A1" {
+		t.Errorf("Expected ManufacturerPart: A1 | Actual Value: %q", unEditedItem.ManufacturerPart)
+	}
 }
