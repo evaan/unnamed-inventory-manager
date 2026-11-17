@@ -1,13 +1,3 @@
-// Dummy tag API, same approach as itemsapi.ts: backed by in-memory data until the backend is wired in.
-// To go live: delete the DUMMY STORE section and swap each function body for the fetch shown in its comment.
-//
-// Backend routes (tags.go):
-//   GET    /tags                      -> { tags: [{id, name}] }
-//   POST   /tags   { name }           -> 201 { tag }   (409 if the name exists, any casing)
-//   DELETE /tags/:id                  -> 204           (also detaches the tag from every item)
-//   PUT    /items/:id/tags { tag_ids } -> { item }     (replaces the item's whole tag set)
-// GET /items must return each item's tags (db.Preload("Tags")); map them with normalizeTag.
-
 export type TagID = string; // uuid on the backend
 
 export interface Tag {
@@ -27,7 +17,6 @@ export const normalizeTag = (raw: RawTag): Tag => ({
   Name: String(raw.Name ?? raw.name),
 });
 
-/* ---------- DUMMY STORE (remove when the API is live) ---------- */
 const SEED_TAG_NAMES = [
   'Resistors',
   'Capacitors',
@@ -68,7 +57,6 @@ export const linkItemTags = (itemId: string, names: string[]) => {
 export const forgetItemTags = (itemId: string) => {
   itemTagLinks.delete(itemId);
 };
-/* ---------- /DUMMY STORE ---------- */
 
 // GET /tags  ->  { tags: Tag[] }
 export const getTags = async (): Promise<Tag[]> => {
