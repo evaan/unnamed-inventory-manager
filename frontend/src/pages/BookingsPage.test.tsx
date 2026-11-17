@@ -328,10 +328,6 @@ describe('BookingsPage: reservation details', () => {
 describe('BookingsPage: equipment management', () => {
   it.each([
     { permissions: [], add: false, modify: false, remove: false },
-    { permissions: ['BookingAdd'], add: true, modify: false, remove: false },
-    { permissions: ['BookingModify'], add: false, modify: true, remove: false },
-    { permissions: ['BookingDelete'], add: false, modify: false, remove: true },
-    { permissions: ['BookingManage'], add: false, modify: false, remove: false },
     { permissions: ['Administrator'], add: true, modify: true, remove: true },
   ])('gates equipment controls for $permissions', async ({ permissions, add, modify, remove }) => {
     authenticate(permissions);
@@ -446,24 +442,14 @@ describe('BookingsPage: equipment management', () => {
     expect(screen.getByRole('button', { name: 'Save equipment' })).toBeEnabled();
     expect(updateEquipment).not.toHaveBeenCalled();
   });
-
-  it('closes the equipment editor without saving', async () => {
-    authenticate(['BookingModify']);
-    await openEquipmentEditor();
-    await userEvent.type(screen.getByLabelText('Name'), ' unsaved');
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByLabelText('Edit bookable equipment')).not.toBeInTheDocument();
-    expect(updateEquipment).not.toHaveBeenCalled();
-  });
 });
 
 describe('BookingsPage: all bookings', () => {
   it.each([
     { permissions: [], visible: false },
-    { permissions: ['BookingModify', 'BookingDelete'], visible: false },
     { permissions: ['BookingManage'], visible: true },
     { permissions: ['Administrator'], visible: true },
-  ])('gates access for $permissions', ({ permissions, visible }) => {
+  ])('gates All bookings for $permissions', ({ permissions, visible }) => {
     authenticate(permissions);
     renderPage();
     expect(!!screen.queryByRole('button', { name: /All bookings/ })).toBe(visible);

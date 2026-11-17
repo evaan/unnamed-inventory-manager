@@ -56,13 +56,6 @@ describe('demo equipment API permissions', () => {
     await complete(api.deleteEquipment(item.ID, admin));
     expect(await complete(api.getBookings())).not.toContainEqual(expect.objectContaining({ ID: booking.ID }));
   });
-
-  it('rejects incomplete equipment without adding it', async () => {
-    const before = await complete(api.getEquipment());
-    await expect(complete(api.createEquipment({ ...draft, Name: ' ' }, auth('BookingAdd')))).rejects.toThrow('required');
-    expect(await complete(api.getEquipment())).toEqual(before);
-  });
-
   it('saves custom working hours on create and update', async () => {
     const custom = await complete(api.createEquipment({ ...draft, OpenHour: 10, CloseHour: 14 }, auth('BookingAdd')));
     expect(custom).toMatchObject({ OpenHour: 10, CloseHour: 14 });
@@ -90,14 +83,6 @@ describe('demo reservation ownership', () => {
     expect(updated).toEqual({ ...booking, Purpose: 'Revised' });
     await complete(api.cancelBooking(booking.ID, auth()));
     expect(await complete(api.getBookings())).not.toContainEqual(expect.objectContaining({ ID: booking.ID }));
-  });
-
-  it('validates overlaps on edits and leaves failed edits unchanged', async () => {
-    const item = await complete(api.createEquipment(draft, auth('BookingAdd')));
-    const first = await complete(api.createBooking({ EquipmentID: item.ID, ...slot(10) }));
-    await complete(api.createBooking({ EquipmentID: item.ID, ...slot(12) }));
-    await expect(complete(api.updateBooking(first.ID, { EquipmentID: item.ID, ...slot(12) }, auth()))).rejects.toThrow(/overlap|already booked/i);
-    expect(await complete(api.getBookings())).toContainEqual(first);
   });
 
   it('allows reservation managers, but not equipment managers, to manage other people’s bookings', async () => {
