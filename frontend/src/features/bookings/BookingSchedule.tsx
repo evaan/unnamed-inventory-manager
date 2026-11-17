@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Activity, CircuitBoard, MapPin, Printer, ScanLine, Wrench } from 'lucide-react';
 import type { Booking, Equipment } from './bookingsapi';
-import { bookingError, equipmentHours, freeHours, MAX_HOURS, overlaps, pad } from './bookingTime';
+import { bookingError, equipmentHours, formatEquipmentHours, freeHours, hourToTime, MAX_HOURS, overlaps, pad, SLOT_HOURS } from './bookingTime';
 
 export const CategoryIcon = ({ category, className }: { category: string; className?: string }) => {
   const Icon = category === '3D printers' ? Printer
@@ -19,9 +19,12 @@ interface Props {
   selectedId: number | null;
   loaded: boolean;
   onSelect: (id: number, hour?: number, duration?: number) => void;
+  onSelectBooking: (booking: Booking) => void;
+  onSelectEquipment?: (id: number) => void;
 }
 
 const hours = Array.from({ length: 24 }, (_, i) => i);
+const slots = Array.from({ length: 24 / SLOT_HOURS }, (_, i) => i * SLOT_HOURS);
 
 interface Selection {
   equipmentId: number;
@@ -30,7 +33,7 @@ interface Selection {
   pointerId: number;
 }
 
-export const BookingSchedule = ({ equipment, bookings, day, now, selectedId, loaded, onSelect }: Props) => {
+export const BookingSchedule = ({ equipment, bookings, day, now, selectedId, loaded, onSelect, onSelectBooking, onSelectEquipment }: Props) => {
   const [selection, setSelection] = useState<Selection | null>(null);
   const drag = useRef<Selection | null>(null);
   const suppressClick = useRef(false);
@@ -47,16 +50,28 @@ export const BookingSchedule = ({ equipment, bookings, day, now, selectedId, loa
       </div>
       {equipment.map((eq) => {
         const equipmentBookings = bookings.get(eq.ID) ?? [];
-        const available = new Set(freeHours(day, equipmentBookings, now, eq.Category));
-        const { open, close } = equipmentHours(eq.Category);
+        const available = new Set(freeHours(day, equipmentBookings, now, eq));
+        const { open, close } = equipmentHours(eq);
         const maintenance = eq.Status === 'MAINTENANCE';
+        const selectedRange = selection?.equipmentId === eq.ID ? {
+          start: Math.min(selection.anchor, selection.end),
+          end: Math.max(selection.anchor, selection.end) + SLOT_HOURS,
+        } : null;
+        const cells = slots.map((hour) => {
+          const start = new Date(day);
+          start.setHours(0, hour * 60, 0, 0);
+          const end = new Date(start);
+          end.setMinutes(end.getMinutes() + SLOT_HOURS * 60);
+          return { hour, booking: equipmentBookings.find((b) => overlaps(start, end, new Date(b.Start), new Date(b.End))) };
+        });
         return (
           <div key={eq.ID} className="flex border-b border-slate-800 last:border-b-0">
             <button
-              onClick={() => onSelect(eq.ID)}
+              onClick={() => onSelectEquipment?.(eq.ID)}
+              disabled={!onSelectEquipment}
               aria-label={`Equipment: ${eq.Name}`}
               aria-pressed={selectedId === eq.ID}
-              className={`sticky left-0 z-10 flex w-52 shrink-0 items-center gap-2.5 border-r border-slate-800 px-3 py-2.5 text-left hover:bg-slate-800 ${selectedId === eq.ID ? 'bg-slate-800' : 'bg-slate-900'}`}
+              className={`sticky left-0 z-10 flex w-52 shrink-0 items-center gap-2.5 border-r border-slate-800 px-3 py-2.5 text-left enabled:hover:bg-slate-800 disabled:cursor-default ${selectedId === eq.ID ? 'bg-slate-800' : 'bg-slate-900'}`}
             >
               <CategoryIcon category={eq.Category} className="h-4 w-4 shrink-0 text-slate-400" />
               <span className="min-w-0">
@@ -64,25 +79,25 @@ export const BookingSchedule = ({ equipment, bookings, day, now, selectedId, loa
                 <span className="mt-1 flex items-center gap-1 text-[10px] text-slate-500">
                   <MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{eq.Location}</span>
                 </span>
-                <span className="mt-1 block text-[10px] text-slate-400">{maintenance ? 'Out of service' : close === 24 ? '24/7' : '08:00–20:00'}</span>
+                <span className="mt-1 block text-[10px] text-slate-400">{maintenance ? 'Out of service' : formatEquipmentHours(eq)}</span>
               </span>
             </button>
             <div
-              className="grid flex-1 touch-pan-y select-none grid-cols-[repeat(24,minmax(0,1fr))] gap-1 p-1"
+              className="grid flex-1 touch-pan-y select-none grid-cols-[repeat(48,minmax(0,1fr))] gap-1 p-1"
               onPointerMove={(event) => {
                 const active = drag.current;
                 if (!active || active.equipmentId !== eq.ID || active.pointerId !== event.pointerId) return;
                 const rect = event.currentTarget.getBoundingClientRect();
                 if (!rect.width) return;
-                const target = Math.max(0, Math.min(23, Math.floor(((event.clientX - rect.left) / rect.width) * 24)));
+                const target = Math.max(0, Math.min(slots.length - 1, Math.floor(((event.clientX - rect.left) / rect.width) * slots.length))) * SLOT_HOURS;
                 const direction = target >= active.anchor ? 1 : -1;
                 let end = active.anchor;
-                for (let hour = active.anchor; direction > 0 ? hour <= target : hour >= target; hour += direction) {
+                for (let hour = active.anchor; direction > 0 ? hour <= target : hour >= target; hour += direction * SLOT_HOURS) {
                   if (!available.has(hour) || Math.abs(hour - active.anchor) >= MAX_HOURS) break;
                   const start = new Date(day);
-                  start.setHours(Math.min(active.anchor, hour), 0, 0, 0);
+                  start.setHours(0, Math.min(active.anchor, hour) * 60, 0, 0);
                   const finish = new Date(day);
-                  finish.setHours(Math.max(active.anchor, hour) + 1, 0, 0, 0);
+                  finish.setHours(0, (Math.max(active.anchor, hour) + SLOT_HOURS) * 60, 0, 0);
                   if (bookingError(eq, equipmentBookings, start, finish, now)) break;
                   end = hour;
                 }
@@ -95,31 +110,35 @@ export const BookingSchedule = ({ equipment, bookings, day, now, selectedId, loa
                 suppressClick.current = true;
                 clearSelection();
                 if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-                onSelect(eq.ID, Math.min(active.anchor, active.end), Math.abs(active.end - active.anchor) + 1);
+                onSelect(eq.ID, Math.min(active.anchor, active.end), Math.abs(active.end - active.anchor) + SLOT_HOURS);
               }}
               onPointerCancel={clearSelection}
               onLostPointerCapture={clearSelection}
             >
-              {hours.map((hour) => {
-                const start = new Date(day);
-                start.setHours(hour, 0, 0, 0);
-                const end = new Date(start);
-                end.setHours(hour + 1);
-                const booking = equipmentBookings.find((b) => overlaps(start, end, new Date(b.Start), new Date(b.End)));
+              {cells.map(({ hour, booking }, index) => {
+                // Merge only cells belonging to the same reservation, not adjacent bookings.
+                if (booking && cells[index - 1]?.booking?.ID === booking.ID) return null;
+                let span = 1;
+                if (booking) {
+                  while (cells[index + span]?.booking?.ID === booking.ID) span++;
+                }
+                const endHour = hour + span * SLOT_HOURS;
                 const closed = maintenance || hour < open || hour >= close;
                 const free = !closed && loaded && available.has(hour);
-                const status = !loaded ? 'Loading' : closed ? 'Unavailable' : booking ? booking.Mine ? 'Your booking' : 'Booked' : free ? 'Available' : 'Past';
-                const highlighted = selection?.equipmentId === eq.ID && hour >= Math.min(selection.anchor, selection.end) && hour <= Math.max(selection.anchor, selection.end);
-                const color = !loaded || closed ? 'bg-slate-900/40 opacity-40'
-                  : booking ? booking.Mine ? 'bg-emerald-500/70' : 'bg-rose-500/70'
+                const status = !loaded ? 'Loading' : booking ? booking.Mine ? 'Your booking' : 'Booked' : closed ? 'Unavailable' : free ? 'Available' : 'Past';
+                const highlighted = !!selectedRange && hour >= selectedRange.start && hour < selectedRange.end;
+                const color = !loaded ? 'bg-slate-900/40 opacity-40'
+                  : booking ? booking.Mine ? 'bg-emerald-500/80' : 'bg-rose-500/80'
+                  : closed ? 'bg-slate-900/40 opacity-40'
                   : free ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-800/40 opacity-40';
                 return (
                   <button
                     key={hour}
-                    disabled={!free}
+                    disabled={!loaded || (!free && !booking)}
                     onPointerDown={(event) => {
-                      if (event.button !== 0 || event.isPrimary === false || !free) return;
+                      if (event.button !== 0 || event.isPrimary === false) return;
                       suppressClick.current = false;
+                      if (!free) return;
                       const active = { equipmentId: eq.ID, anchor: hour, end: hour, pointerId: event.pointerId };
                       drag.current = active;
                       setSelection(active);
@@ -127,15 +146,25 @@ export const BookingSchedule = ({ equipment, bookings, day, now, selectedId, loa
                     }}
                     onClick={(event) => {
                       if (event.detail !== 0 && suppressClick.current) { suppressClick.current = false; return; }
-                      onSelect(eq.ID, hour, 1);
+                      if (booking) { onSelectBooking(booking); return; }
+                      onSelect(eq.ID, hour, SLOT_HOURS);
                     }}
-                    aria-label={`${eq.Name} at ${pad(hour)}:00: ${status}`}
-                    title={`${pad(hour)}:00–${pad(hour + 1)}:00 · ${status}`}
+                    aria-label={`${eq.Name} ${booking ? `from ${hourToTime(hour)} to ${hourToTime(endHour)}` : `at ${hourToTime(hour)}`}: ${status}`}
+                    title={`${hourToTime(hour)}–${hourToTime(endHour)} · ${status}`}
                     aria-pressed={highlighted}
-                    className={`booking-hour my-2 h-11 rounded-md transition-colors enabled:cursor-crosshair disabled:cursor-default ${color} ${highlighted ? '!bg-slate-500' : ''}`}
+                    style={{ gridColumn: `${index + 1} / span ${span}`, gridRow: 1 }}
+                    className={`booking-hour my-2 h-11 rounded-md transition-colors ${booking ? 'enabled:cursor-pointer hover:brightness-110' : 'enabled:cursor-crosshair'} disabled:cursor-default ${color} ${highlighted ? 'opacity-0' : ''}`}
                   />
                 );
               })}
+              {selectedRange && <div
+                role="status"
+                aria-label={`New reservation from ${hourToTime(selectedRange.start)} to ${hourToTime(selectedRange.end)}`}
+                style={{ gridColumn: `${selectedRange.start / SLOT_HOURS + 1} / span ${(selectedRange.end - selectedRange.start) / SLOT_HOURS}`, gridRow: 1 }}
+                className="pointer-events-none z-10 my-2 flex h-11 items-center justify-center overflow-hidden rounded-md bg-slate-500 px-1 text-xs font-medium text-white ring-1 ring-inset ring-slate-300/40"
+              >
+                <span className="truncate">{hourToTime(selectedRange.start)}–{hourToTime(selectedRange.end)}</span>
+              </div>}
             </div>
           </div>
         );

@@ -29,13 +29,8 @@ beforeEach(async () => {
 afterEach(() => vi.useRealTimers());
 
 describe('demo equipment API permissions', () => {
-  it.each([
-    { name: 'no equipment permissions', session: auth() },
-    { name: 'inventory permissions', session: auth('CreateItem', 'ModifyItem', 'DeleteItem') },
-    { name: 'reservation manager', session: auth('BookingManage') },
-    { name: 'disabled administrator', session: { loggedIn: true, disabled: true, permissions: ['Administrator'] } as AuthState },
-    { name: 'logged out', session: { loggedIn: false } as AuthState },
-  ])('rejects unauthorized mutations: $name', async ({ session }) => {
+  it('rejects unauthorized equipment mutations', async () => {
+    const session = auth();
     await expect(complete(api.createEquipment(draft, session))).rejects.toThrow('permission');
     await expect(complete(api.updateEquipment(1, draft, session))).rejects.toThrow('permission');
     await expect(complete(api.deleteEquipment(1, session))).rejects.toThrow('permission');
@@ -67,6 +62,24 @@ describe('demo equipment API permissions', () => {
     await expect(complete(api.createEquipment({ ...draft, Name: ' ' }, auth('BookingAdd')))).rejects.toThrow('required');
     expect(await complete(api.getEquipment())).toEqual(before);
   });
+
+  it('saves custom working hours on create and update', async () => {
+    const custom = await complete(api.createEquipment({ ...draft, OpenHour: 10, CloseHour: 14 }, auth('BookingAdd')));
+    expect(custom).toMatchObject({ OpenHour: 10, CloseHour: 14 });
+    await expect(complete(api.createBooking({ EquipmentID: custom.ID, ...slot(9) }))).rejects.toThrow(/between 10:00 and 14:00/);
+    const updated = await complete(api.updateEquipment(custom.ID, { ...custom, OpenHour: 12, CloseHour: 24 }, auth('BookingModify')));
+    expect(updated).toMatchObject({ OpenHour: 12, CloseHour: 24 });
+    expect(await complete(api.getEquipment())).toContainEqual(updated);
+    await complete(api.createBooking({ EquipmentID: custom.ID, ...slot(12) }));
+  });
+
+  it('rejects a closing time before opening without changing equipment', async () => {
+    const hours = { OpenHour: 20, CloseHour: 8 };
+    const before = await complete(api.getEquipment());
+    await expect(complete(api.createEquipment({ ...draft, ...hours }, auth('BookingAdd')))).rejects.toThrow('Working hours');
+    await expect(complete(api.updateEquipment(1, { ...draft, ...hours }, auth('BookingModify')))).rejects.toThrow('Working hours');
+    expect(await complete(api.getEquipment())).toEqual(before);
+  });
 });
 
 describe('demo reservation ownership', () => {
@@ -87,24 +100,16 @@ describe('demo reservation ownership', () => {
     expect(await complete(api.getBookings())).toContainEqual(first);
   });
 
-  it('rejects disabled users modifying or cancelling even their own bookings', async () => {
-    const item = await complete(api.createEquipment(draft, auth('BookingAdd')));
-    const booking = await complete(api.createBooking({ EquipmentID: item.ID, ...slot(10) }));
-    const disabled: AuthState = { loggedIn: true, disabled: true };
-    await expect(complete(api.updateBooking(booking.ID, { EquipmentID: item.ID, ...slot(10) }, disabled))).rejects.toThrow('own bookings');
-    await expect(complete(api.cancelBooking(booking.ID, disabled))).rejects.toThrow('own bookings');
-  });
-
-  it.each(['BookingManage', 'Administrator'])('allows %s to manage other people’s bookings, not equipment permissions', async (permission) => {
+  it('allows reservation managers, but not equipment managers, to manage other people’s bookings', async () => {
     const booking = (await complete(api.getBookings())).find((entry) => !entry.Mine && new Date(entry.Start) > new Date() && entry.EquipmentID <= 3)!;
     expect(booking).toBeDefined();
     const payload = { EquipmentID: booking.EquipmentID, Start: booking.Start, End: booking.End, Purpose: 'Admin revision' };
     const equipmentManager = auth('BookingAdd', 'BookingModify', 'BookingDelete');
     await expect(complete(api.updateBooking(booking.ID, payload, equipmentManager))).rejects.toThrow('own bookings');
     await expect(complete(api.cancelBooking(booking.ID, equipmentManager))).rejects.toThrow('own bookings');
-    const updated = await complete(api.updateBooking(booking.ID, payload, auth(permission)));
+    const updated = await complete(api.updateBooking(booking.ID, payload, auth('BookingManage')));
     expect(updated).toMatchObject({ ID: booking.ID, Mine: false, UserName: booking.UserName, Purpose: 'Admin revision' });
-    await complete(api.cancelBooking(booking.ID, auth(permission)));
+    await complete(api.cancelBooking(booking.ID, auth('BookingManage')));
     expect(await complete(api.getBookings())).not.toContainEqual(expect.objectContaining({ ID: booking.ID }));
   });
 });

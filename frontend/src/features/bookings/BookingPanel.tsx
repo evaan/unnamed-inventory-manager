@@ -6,7 +6,7 @@ import { INPUT } from '../../components/styles';
 import type { AuthState } from '../auth/auth';
 import { canManageReservation } from './bookingPermissions';
 import type { Booking, Equipment, NewBooking } from './bookingsapi';
-import { bookingError, bookingsForDay, equipmentHours, fmtDay, fmtTime, freeHours, MAX_HOURS, pad, sameDay, startOfDay, toDateInput, weekDates } from './bookingTime';
+import { bookingError, bookingsForDay, equipmentHours, fmtDay, fmtTime, formatEquipmentHours, freeHours, hourToTime, MAX_HOURS, pad, sameDay, SLOT_HOURS, startOfDay, toDateInput, weekDates } from './bookingTime';
 
 interface Props {
   equipment: Equipment;
@@ -25,17 +25,15 @@ interface Props {
   auth: AuthState;
   initialBooking?: Booking;
   onUpdate: (id: number, booking: NewBooking) => Promise<string | null>;
-  onEditEquipment?: () => void;
-  onDeleteEquipment?: () => void;
   busy: boolean;
 }
 
-export const BookingPanel = ({ equipment, initialDate, initialHour, initialDuration = 1, bookings, now, onClose, onBook, onCancel, onSavingChange, error: cancelError, onDismissError, bookingsLoaded, auth, initialBooking, onUpdate, onEditEquipment, onDeleteEquipment, busy }: Props) => {
-  const hours = equipmentHours(equipment.Category);
-  const defaultStart = (value: string) => `${pad(freeHours(startOfDay(value), bookings, now, equipment.Category)[0] ?? hours.open)}:00`;
+export const BookingPanel = ({ equipment, initialDate, initialHour, initialDuration = SLOT_HOURS, bookings, now, onClose, onBook, onCancel, onSavingChange, error: cancelError, onDismissError, bookingsLoaded, auth, initialBooking, onUpdate, busy }: Props) => {
+  const hours = equipmentHours(equipment);
+  const defaultStart = (value: string) => hourToTime(freeHours(startOfDay(value), bookings, now, equipment)[0] ?? hours.open);
   const [editing, setEditing] = useState<Booking | null>(initialBooking ?? null);
   const [date, setDate] = useState(initialBooking ? toDateInput(new Date(initialBooking.Start)) : initialDate);
-  const [startTime, setStartTime] = useState(() => initialBooking ? `${pad(new Date(initialBooking.Start).getHours())}:${pad(new Date(initialBooking.Start).getMinutes())}` : initialHour === undefined ? defaultStart(initialDate) : `${pad(initialHour)}:00`);
+  const [startTime, setStartTime] = useState(() => initialBooking ? `${pad(new Date(initialBooking.Start).getHours())}:${pad(new Date(initialBooking.Start).getMinutes())}` : initialHour === undefined ? defaultStart(initialDate) : hourToTime(initialHour));
   const [duration, setDuration] = useState(initialBooking ? (new Date(initialBooking.End).getTime() - new Date(initialBooking.Start).getTime()) / 3600_000 : initialDuration);
   const [purpose, setPurpose] = useState(initialBooking?.Purpose ?? '');
   const [error, setError] = useState('');
@@ -104,13 +102,9 @@ export const BookingPanel = ({ equipment, initialDate, initialHour, initialDurat
       <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
         <div className="space-y-2 text-sm text-slate-400">
           <p>{equipment.Description}</p>
-          <p>{hours.close === 24 ? '3D printer · Available 24/7' : 'Working hours · 08:00–20:00'}</p>
+          <p>Working hours · {formatEquipmentHours(equipment)}</p>
           <p>Maximum {MAX_HOURS} consecutive hours. Next seven days only.</p>
         </div>
-        {(onEditEquipment || onDeleteEquipment) && <div className="flex flex-wrap gap-2">
-          {onEditEquipment && <button disabled={saving} onClick={onEditEquipment} className="ui-button-secondary"><Pencil className="h-4 w-4" />Edit equipment</button>}
-          {onDeleteEquipment && <button disabled={saving} onClick={onDeleteEquipment} className="ui-button-secondary !text-rose-300"><Trash2 className="h-4 w-4" />Delete equipment</button>}
-        </div>}
         {!bookable ? <p className="rounded-lg bg-rose-500/10 p-3 text-sm text-rose-300">Out of service. {equipment.MaintenanceNote} This equipment can't be booked until it's back in service.</p> : (
           <form onSubmit={submit} className="space-y-4">
             {editing && <div className="flex items-center justify-between gap-2">
@@ -118,15 +112,15 @@ export const BookingPanel = ({ equipment, initialDate, initialHour, initialDurat
               <button type="button" disabled={saving} onClick={() => { setEditing(null); setPurpose(''); setError(''); }} className="ui-button-ghost">New reservation</button>
             </div>}
             <Field label="Date" required>
-              <input type="date" required min={toDateInput(now)} max={toDateInput(weekDates(now)[6])} value={date} disabled={saving} onChange={(event) => { setDate(event.target.value); setStartTime(`${pad(freeHours(startOfDay(event.target.value), otherBookings, now, equipment.Category)[0] ?? hours.open)}:00`); clearMessages(); }} className={INPUT} />
+              <input type="date" required min={toDateInput(now)} max={toDateInput(weekDates(now)[6])} value={date} disabled={saving} onChange={(event) => { setDate(event.target.value); setStartTime(hourToTime(freeHours(startOfDay(event.target.value), otherBookings, now, equipment)[0] ?? hours.open)); clearMessages(); }} className={INPUT} />
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Start" required>
-                <input type="time" required step={900} min={`${pad(hours.open)}:00`} max={hours.close === 24 ? '23:45' : `${pad(hours.close)}:00`} value={startTime} disabled={saving} onChange={(event) => { setStartTime(event.target.value); clearMessages(); }} className={INPUT} />
+                <input type="time" required step={SLOT_HOURS * 3600} min={`${pad(hours.open)}:00`} max={hourToTime(hours.close - SLOT_HOURS)} value={startTime} disabled={saving} onChange={(event) => { setStartTime(event.target.value); clearMessages(); }} className={INPUT} />
               </Field>
               <Field label="Duration" required>
                 <select value={duration} disabled={saving} onChange={(event) => { setDuration(Number(event.target.value)); clearMessages(); }} className={INPUT}>
-                  {[...new Set([...Array.from({ length: MAX_HOURS }, (_, i) => i + 1), duration])].sort((a, b) => a - b).map((hour) => <option key={hour} value={hour}>{hour} {hour === 1 ? 'hour' : 'hours'}</option>)}
+                  {[...new Set([...Array.from({ length: MAX_HOURS / SLOT_HOURS }, (_, i) => (i + 1) * SLOT_HOURS), duration])].sort((a, b) => a - b).map((hour) => <option key={hour} value={hour}>{hour < 1 ? `${hour * 60} minutes` : `${hour} ${hour === 1 ? 'hour' : 'hours'}`}</option>)}
                 </select>
               </Field>
             </div>

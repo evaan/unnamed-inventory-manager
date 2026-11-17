@@ -3,10 +3,28 @@ import type { Booking, Equipment } from './bookingsapi';
 export const OPEN_HOUR = 8;
 export const CLOSE_HOUR = 20;
 export const MAX_HOURS = 8;
-// Temporary rules for the dummy booking API.
-export const equipmentHours = (category: string) =>
-  category === '3D printers' ? { open: 0, close: 24 } : { open: OPEN_HOUR, close: CLOSE_HOUR };
+export const SLOT_HOURS = 0.5;
+type HoursSource = string | Pick<Equipment, 'Category' | 'OpenHour' | 'CloseHour'>;
+export const equipmentHours = (equipment: HoursSource) => {
+  const category = (typeof equipment === 'string' ? equipment : equipment.Category).trim();
+  const defaults = category === '3D printers' ? { open: 0, close: 24 } : { open: OPEN_HOUR, close: CLOSE_HOUR };
+  return typeof equipment === 'string' ? defaults : {
+    open: equipment.OpenHour ?? defaults.open,
+    close: equipment.CloseHour ?? defaults.close,
+  };
+};
+export const equipmentHoursError = (equipment: HoursSource): string | null => {
+  const { open, close } = equipmentHours(equipment);
+  return !Number.isInteger(open) || !Number.isInteger(close) || open < 0 || close > 24 || open >= close
+    ? 'Working hours must use whole hours between 00:00 and 24:00, with closing after opening.'
+    : null;
+};
 export const pad = (n: number) => String(n).padStart(2, '0');
+export const hourToTime = (hour: number) => `${pad(Math.floor(hour))}:${pad(Math.round((hour % 1) * 60))}`;
+export const formatEquipmentHours = (equipment: HoursSource) => {
+  const { open, close } = equipmentHours(equipment);
+  return open === 0 && close === 24 ? '24/7' : `${pad(open)}:00–${pad(close)}:00`;
+};
 export const toDateInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 export const startOfDay = (date: string) => new Date(`${date}T00:00`);
 export const weekDates = (now: Date) => Array.from({ length: 7 }, (_, i) => {
@@ -38,13 +56,13 @@ export const bookingsForDay = (bookings: Booking[], day: Date) => {
     .sort((a, b) => a.Start.localeCompare(b.Start));
 };
 
-export const freeHours = (day: Date, bookings: Booking[], now: Date, category = '') => {
-  const { open, close } = equipmentHours(category);
-  return Array.from({ length: close - open }, (_, i) => i + open).filter((hour) => {
+export const freeHours = (day: Date, bookings: Booking[], now: Date, equipment: HoursSource = '') => {
+  const { open, close } = equipmentHours(equipment);
+  return Array.from({ length: (close - open) / SLOT_HOURS }, (_, i) => open + i * SLOT_HOURS).filter((hour) => {
     const start = new Date(day);
-    start.setHours(hour, 0, 0, 0);
+    start.setHours(0, hour * 60, 0, 0);
     const end = new Date(start);
-    end.setHours(hour + 1);
+    end.setMinutes(end.getMinutes() + SLOT_HOURS * 60);
     return start >= now && end <= bookingWindowEnd(now) &&
       !bookings.some((b) => overlaps(start, end, new Date(b.Start), new Date(b.End)));
   });
@@ -57,8 +75,8 @@ export const bookingError = (equipment: Equipment, bookings: Booking[], start: D
   if (start < now) return 'That start time is in the past.';
   if (start >= bookingWindowEnd(now) || end > bookingWindowEnd(now)) return 'Bookings are limited to the next seven days.';
   if (end.getTime() - start.getTime() > MAX_HOURS * 3600_000) return `Bookings can be at most ${MAX_HOURS} hours.`;
-  const { open, close } = equipmentHours(equipment.Category);
-  if (close !== 24) {
+  const { open, close } = equipmentHours(equipment);
+  if (open !== 0 || close !== 24) {
     const opens = new Date(start);
     opens.setHours(open, 0, 0, 0);
     const closes = new Date(start);
