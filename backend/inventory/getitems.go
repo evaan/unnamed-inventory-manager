@@ -8,7 +8,7 @@ import (
 )
 
 // @Summary		Get all Items
-// @Description	Gets information for all items
+// @Description	Gets information for all items, including their categories
 // @Tags			Item
 // @Accept			json
 // @Success		200		"Item information retrieved"
@@ -18,10 +18,11 @@ func GetItems(c *gin.Context, db *gorm.DB) {
 	// TODO: add pagination and DTO
 	var items []Item
 
-	if err := db.Find(&items).Error; err != nil {
+	if err := db.Preload("Categories").Find(&items).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Error retrieving item information",
 		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{

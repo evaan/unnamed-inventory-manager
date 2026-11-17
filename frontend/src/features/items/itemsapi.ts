@@ -1,6 +1,5 @@
-import type { Tag } from './tagsapi';
-
-const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/+$/, '');
+import { request } from './inventoryRequest';
+import { normalizeTag, type ServerCategory, type Tag, type TagID } from './tagsapi';
 
 // Shape of an item as the server returns it.
 interface ServerItem {
@@ -13,9 +12,7 @@ interface ServerItem {
   DistributorURL: string;
   DataSheetURL: string;
   Description: string;
-  // Filled in by the API. Change tags with setItemTags in tagsapi.ts.
-  // Live: map the backend's `tags` array with normalizeTag from tagsapi.ts.
-  Tags?: Tag[];
+  Categories: ServerCategory[] | null;
 }
 
 // Item as the app uses it. Optional text fields come back as '' when unset.
@@ -29,7 +26,6 @@ export interface Item {
   distributorURL: string;
   dataSheetURL: string;
   description: string;
-  // Tags on the item. Undefined if the server didn't include them. Change with setItemTags in tagsapi.ts.
   Tags?: Tag[];
 }
 
@@ -43,7 +39,7 @@ const fromServer = (s: ServerItem): Item => ({
   distributorURL: s.DistributorURL,
   dataSheetURL: s.DataSheetURL,
   description: s.Description,
-  Tags: s.Tags,
+  Tags: (s.Categories ?? []).map(normalizeTag),
 });
 
 // POST /items body (CreateItemReq). The server requires itemName, manufacturer and
@@ -53,6 +49,7 @@ export interface NewItem {
   quantity: number;
   manufacturer: string;
   manufacturerPart: string;
+  categories?: TagID[];
   distributorPart?: string;
   distributorURL?: string;
   dataSheetURL?: string;
@@ -67,26 +64,12 @@ export interface UpdateItem {
   quantity?: number;
   manufacturer?: string;
   manufacturerPart?: string;
+  categories?: TagID[];
   distributorPart?: string;
   distributorURL?: string;
   dataSheetURL?: string;
   itemDescription?: string;
   logDescription?: string;
-}
-
-async function request(path: string, init: RequestInit, errorPrefix: string): Promise<Response> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    credentials: 'include',
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init.headers },
-  });
-  if (!res.ok) {
-    // The API reports errors as { "error": "..." }.
-    const body = await res.json().catch(() => null);
-    const detail = body && typeof body.error === 'string' ? body.error : '';
-    throw new Error(`${errorPrefix} (${res.status})${detail ? `: ${detail}` : ''}`);
-  }
-  return res;
 }
 
 // GET /items -> { items: Item[] }   (items is null when the table is empty)

@@ -75,8 +75,16 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 			inventory.GetCategoryByID(c, db)
 		})
 
-		public.POST("/categories", func(c *gin.Context) {
+		public.POST("/categories", middleware.PermissionRequired(db, auth.PermissionCreateTag), func(c *gin.Context) {
 			inventory.CreateCategory(c, db)
+		})
+
+		public.PATCH("/categories/:id", middleware.PermissionRequired(db, auth.PermissionCreateTag), func(c *gin.Context) {
+			inventory.MoveCategory(c, db)
+		})
+
+		public.DELETE("/categories/:id", middleware.PermissionRequired(db, auth.PermissionDeleteTag), func(c *gin.Context) {
+			inventory.DeleteCategory(c, db)
 		})
 
 		public.POST("/items", func(c *gin.Context) {

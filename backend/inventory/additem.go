@@ -85,7 +85,7 @@ func AddItem(c *gin.Context, db *gorm.DB) {
 		newItem.Categories = categories
 	}
 
-	if err := db.Create(&newItem).Error; err != nil {
+	if err := db.Omit("Categories.*").Create(&newItem).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to create item",
 		})

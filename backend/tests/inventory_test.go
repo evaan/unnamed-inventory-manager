@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"testing"
 	"uuid"
-
-	"slices"
 
 	"gorm.io/gorm"
 
@@ -263,17 +262,19 @@ func TestRemoveItem(t *testing.T) {
 	}
 }
 
-func TestAddCategory(t *testing.T) {
+func TestCreateAndDeleteCategory(t *testing.T) {
 	router, db := newAuthRouter(t)
+	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		t.Fatal(err)
+	}
+	_, createToken := newTestSession(t, db, auth.PermissionCreateTag)
+	_, deleteToken := newTestSession(t, db, auth.PermissionDeleteTag)
 	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
 
-	body := `{
-		"categoryName": "TestCategory1"
-	}`
-
-	response := makeRequest(router, http.MethodPost, "/categories", body, adminToken)
-
-	// Ensure HTTP response is correct
+	const body = `{"categoryName":"TestCategory1"}`
+	requireStatus(t, makeRequest(router, http.MethodPost, "/categories", body, ""), http.StatusUnauthorized)
+	requireStatus(t, makeRequest(router, http.MethodPost, "/categories", body, deleteToken), http.StatusForbidden)
+	response := makeRequest(router, http.MethodPost, "/categories", body, createToken)
 	requireStatus(t, response, http.StatusCreated)
 
 	var result struct {
@@ -295,6 +296,33 @@ func TestAddCategory(t *testing.T) {
 	if addedItemCategory.CategoryName != "TestCategory1" {
 		t.Errorf("Expected Name: TestCategory1 | Actual Value: %q", addedItemCategory.CategoryName)
 	}
+
+	child := inventory.ItemCategory{ID: uuid.New(), CategoryName: "Child", ParentID: &addedItemCategory.ID}
+	if err := db.Create(&child).Error; err != nil {
+		t.Fatal(err)
+	}
+	item := inventory.Item{
+		ID: uuid.New(), ItemName: "Test item", Manufacturer: "Test company", ManufacturerPart: "A1",
+		Categories: []inventory.ItemCategory{addedItemCategory, child},
+	}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	path := "/categories/" + addedItemCategory.ID.String()
+	requireStatus(t, makeRequest(router, http.MethodDelete, path, "", ""), http.StatusUnauthorized)
+	requireStatus(t, makeRequest(router, http.MethodDelete, path, "", createToken), http.StatusForbidden)
+	requireStatus(t, makeRequest(router, http.MethodDelete, path, "", deleteToken), http.StatusNoContent)
+	requireStatus(t, makeRequest(router, http.MethodDelete, path, "", deleteToken), http.StatusNotFound)
+
+	var remaining inventory.Item
+	if err := db.Preload("Categories").First(&remaining, "id = ?", item.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(remaining.Categories) != 1 || remaining.Categories[0].ID != child.ID || remaining.Categories[0].ParentID != nil {
+		t.Errorf("Expected the child to remain linked to the item as a top-level category, got %+v", remaining.Categories)
+	}
+	requireStatus(t, makeRequest(router, http.MethodDelete, "/categories/"+child.ID.String(), "", adminToken), http.StatusNoContent)
 }
 
 func TestAddSubCategory(t *testing.T) {
@@ -344,6 +372,33 @@ func TestAddSubCategory(t *testing.T) {
 
 	if retrievedParent.CategoryName != "TestParentCategory" {
 		t.Errorf("Expected Name: TestParentCategory | Actual Value: %q", retrievedParent.CategoryName)
+	}
+
+	_, createToken := newTestSession(t, db, auth.PermissionCreateTag)
+	_, modifyToken := newTestSession(t, db, auth.PermissionModifyItem)
+	childPath := "/categories/" + addedSubCategory.ID.String()
+	parentPath := "/categories/" + testParentCategory.ID.String()
+	const topLevel = `{"parentID":null}`
+	requireStatus(t, makeRequest(router, http.MethodPatch, childPath, topLevel, modifyToken), http.StatusForbidden)
+	requireStatus(t, makeRequest(router, http.MethodPatch, childPath, `{}`, createToken), http.StatusBadRequest)
+	requireStatus(t, makeRequest(router, http.MethodPatch, childPath, `{"parentID":"`+uuid.New().String()+`"}`, createToken), http.StatusNotFound)
+	requireStatus(t, makeRequest(router, http.MethodPatch, parentPath, `{"parentID":"`+addedSubCategory.ID.String()+`"}`, createToken), http.StatusBadRequest)
+
+	requireStatus(t, makeRequest(router, http.MethodPatch, childPath, topLevel, adminToken), http.StatusNoContent)
+	var moved inventory.ItemCategory
+	if err := db.First(&moved, "id = ?", addedSubCategory.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if moved.ParentID != nil {
+		t.Fatal("Expected the category to become top-level")
+	}
+
+	requireStatus(t, makeRequest(router, http.MethodPatch, childPath, `{"parentID":"`+testParentCategory.ID.String()+`"}`, createToken), http.StatusNoContent)
+	if err := db.First(&moved, "id = ?", addedSubCategory.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if moved.ParentID == nil || *moved.ParentID != testParentCategory.ID {
+		t.Fatal("Expected the category to move under the selected parent")
 	}
 }
 
@@ -469,23 +524,31 @@ func TestAttachCategoryByUpdatingItem(t *testing.T) {
 		t.Fatalf("Can't decode item created: %v", err)
 	}
 
-	var editedItem inventory.Item
-
-	// Ensure Item was successfully added to the database
-	if err := db.Preload("Categories").First(&editedItem, "id = ?", result.Item.ID).Error; err != nil {
-		t.Fatalf("Created item wasn't found in the database: %v", err)
+	itemPath := "/items/" + testItemToEdit.ID.String()
+	editedItem := result.Item
+	response = makeRequest(router, http.MethodGet, itemPath, "", "")
+	requireStatus(t, response, http.StatusOK)
+	result.Item = inventory.Item{}
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
 	}
-
-	// Ensure the categories are correct
-	if !slices.ContainsFunc(editedItem.Categories, func(category inventory.ItemCategory) bool {
-		return category.ID == testCategory1.ID
-	}) {
-		t.Errorf("Couldn't find testCategory1 ID")
+	response = makeRequest(router, http.MethodGet, "/items", "", "")
+	requireStatus(t, response, http.StatusOK)
+	var list struct {
+		Items []inventory.Item `json:"items"`
 	}
-	if !slices.ContainsFunc(editedItem.Categories, func(category inventory.ItemCategory) bool {
-		return category.ID == testCategory2.ID
-	}) {
-		t.Errorf("Couldn't find testCategory2 ID")
+	if err := json.Unmarshal(response.Body.Bytes(), &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("Expected one item, got %d", len(list.Items))
+	}
+	for _, item := range []inventory.Item{editedItem, result.Item, list.Items[0]} {
+		if len(item.Categories) != 2 ||
+			!slices.Contains(item.Categories, testCategory1) ||
+			!slices.Contains(item.Categories, testCategory2) {
+			t.Errorf("Expected both categories, got %+v", item.Categories)
+		}
 	}
 
 	// Ensure the other properties of the item haven't been modified
@@ -500,6 +563,24 @@ func TestAttachCategoryByUpdatingItem(t *testing.T) {
 	}
 	if editedItem.ManufacturerPart != "A1" {
 		t.Errorf("Expected ManufacturerPart: A1 | Actual Value: %q", editedItem.ManufacturerPart)
+	}
+
+	for _, update := range []struct {
+		body  string
+		count int
+	}{
+		{`{"quantity":2}`, 2},
+		{`{"categories":[]}`, 0},
+	} {
+		response = makeRequest(router, http.MethodPut, itemPath, update.body, adminToken)
+		requireStatus(t, response, http.StatusOK)
+		result.Item = inventory.Item{}
+		if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		if result.Item.Categories == nil || len(result.Item.Categories) != update.count {
+			t.Errorf("Expected an array of %d categories after %s, got %#v", update.count, update.body, result.Item.Categories)
+		}
 	}
 }
 
@@ -559,8 +640,8 @@ func TestAttachInvalidCategory(t *testing.T) {
 		t.Fatalf("Can't decode item created: %v", err)
 	}
 
-	if result.Error != "Adding tag that wasn't found in the database" {
-		t.Fatalf("Incorrect error message, Expected (Adding tag that wasn't found in the database) | Actual response error message: %s", result.Error)
+	if result.Error != "Category not found" {
+		t.Fatalf("Expected Category not found, got %q", result.Error)
 	}
 }
 

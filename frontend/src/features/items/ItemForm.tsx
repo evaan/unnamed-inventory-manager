@@ -2,8 +2,9 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Field } from '../../components/Field';
 import { INPUT } from '../../components/styles';
 import type { Item, NewItem } from './itemsapi';
+import { MAX_ITEM_QUANTITY } from './itemStock';
 
-type Draft = Record<Exclude<keyof NewItem, 'logDescription'>, string>;
+type Draft = Record<Exclude<keyof NewItem, 'categories' | 'logDescription'>, string>;
 const toDraft = (item: Item): Draft => ({
   itemName: item.itemName,
   quantity: String(item.quantity),
@@ -59,7 +60,7 @@ export const ItemForm = ({ item, editing = false, saving, onDirtyChange, onSave,
       return;
     }
     const quantity = Number(draft.quantity);
-    if (!editing && (!draft.quantity.trim() || !Number.isInteger(quantity) || quantity < 0 || quantity > 2147483647)) {
+    if (!editing && (!draft.quantity.trim() || !Number.isInteger(quantity) || quantity < 0 || quantity > MAX_ITEM_QUANTITY)) {
       setError('Quantity must be a whole number between 0 and 2,147,483,647.');
       return;
     }
@@ -86,7 +87,7 @@ export const ItemForm = ({ item, editing = false, saving, onDirtyChange, onSave,
           </Field>
           {!editing && (
             <Field label="Quantity" required>
-              <input type="number" inputMode="numeric" min={0} max={2147483647} step={1} required value={draft.quantity} onChange={(e) => set('quantity', e.target.value)} className={INPUT} />
+              <input type="number" inputMode="numeric" min={0} max={MAX_ITEM_QUANTITY} step={1} required value={draft.quantity} onChange={(e) => set('quantity', e.target.value)} className={INPUT} />
             </Field>
           )}
           <Field label="Manufacturer" required>

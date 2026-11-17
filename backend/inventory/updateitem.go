@@ -12,7 +12,7 @@ import (
 )
 
 // @Summary		Update item
-// @Description	Update item information
+// @Description	Update item information and return its categories. Send category IDs to replace the current categories, or an empty list to clear them.
 // @Tags			Item
 // @Accept			json
 // @Param			id		path	string				true	"Item ID"	Format(uuid)
@@ -109,15 +109,15 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 		for _, reqID := range *req.Categories {
 			if !databaseIDS[reqID] {
 				c.JSON(http.StatusBadRequest, gin.H{
-					"error": "Adding tag that wasn't found in the database",
+					"error": "Category not found",
 				})
 				return
 			}
 		}
 
-		if err := db.Model(&item).Association("Categories").Replace(categories); err != nil {
+		if err := db.Model(&item).Omit("Categories.*").Association("Categories").Replace(categories); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Error updating the items tag",
+				"error": "Failed to update item categories",
 			})
 			return
 		}
@@ -162,7 +162,7 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 	}
 
 	// Return item
-	if err := db.First(&item, "id = ?", id).Error; err != nil {
+	if err := db.Preload("Categories").First(&item, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to retrieve updated item",
 		})

@@ -81,7 +81,7 @@
                 }
             },
             "post": {
-                "description": "Adds a category for items to the inventory manager",
+                "description": "Adds a category for items. Requires CreateTag or Administrator.",
                 "consumes": [
                     "application/json"
                 ],
@@ -106,6 +106,12 @@
                     },
                     "400": {
                         "description": "Invalid request body"
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Permission denied or invalid frontend Origin or Referer"
                     },
                     "500": {
                         "description": "Error creating category"
@@ -147,11 +153,97 @@
                         "description": "Error retrieving item category"
                     }
                 }
+            },
+            "delete": {
+                "description": "Removes the category from all items and makes its direct children top-level categories. Requires DeleteTag or Administrator.",
+                "tags": [
+                    "Category"
+                ],
+                "summary": "Delete an item category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Item Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Category deleted"
+                    },
+                    "400": {
+                        "description": "Invalid category ID"
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Permission denied or invalid frontend Origin or Referer"
+                    },
+                    "404": {
+                        "description": "Category not found"
+                    },
+                    "500": {
+                        "description": "Error deleting category"
+                    }
+                }
+            },
+            "patch": {
+                "description": "Set the parent of a category, or send null to make it a top-level category. Requires CreateTag or Administrator.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Category"
+                ],
+                "summary": "Move an item category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Item Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New parent category ID or null",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/inventory.MoveCategoryReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Category moved"
+                    },
+                    "400": {
+                        "description": "Invalid ID, invalid request body or circular category hierarchy"
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Permission denied or invalid frontend Origin or Referer"
+                    },
+                    "404": {
+                        "description": "Category or parent category not found"
+                    },
+                    "500": {
+                        "description": "Error moving category"
+                    }
+                }
             }
         },
         "/items": {
             "get": {
-                "description": "Gets information for all items",
+                "description": "Gets information for all items, including their categories",
                 "consumes": [
                     "application/json"
                 ],
@@ -203,7 +295,7 @@
         },
         "/items/{id}": {
             "get": {
-                "description": "Gets full information for one item",
+                "description": "Gets full information for one item, including its categories",
                 "consumes": [
                     "application/json"
                 ],
@@ -237,7 +329,7 @@
                 }
             },
             "put": {
-                "description": "Update item information",
+                "description": "Update item information and return its categories. Send category IDs to replace the current categories, or an empty list to clear them.",
                 "consumes": [
                     "application/json"
                 ],
@@ -966,6 +1058,19 @@
                 },
                 "quantity": {
                     "type": "integer"
+                }
+            }
+        },
+        "inventory.MoveCategoryReq": {
+            "type": "object",
+            "required": [
+                "parentID"
+            ],
+            "properties": {
+                "parentID": {
+                    "type": "string",
+                    "format": "uuid",
+                    "x-nullable": true
                 }
             }
         },

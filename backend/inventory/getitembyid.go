@@ -10,7 +10,7 @@ import (
 )
 
 // @Summary		Get item
-// @Description	Gets full information for one item
+// @Description	Gets full information for one item, including its categories
 // @Tags			Item
 // @Accept			json
 // @Param			id		path	string				true	"Item ID"	Format(uuid)
@@ -37,7 +37,7 @@ func GetItemByID(c *gin.Context, db *gorm.DB) {
 	}
 
 	var item Item
-	if err := db.First(&item, "id = ?", id).Error; err != nil {
+	if err := db.Preload("Categories").First(&item, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Item not found",

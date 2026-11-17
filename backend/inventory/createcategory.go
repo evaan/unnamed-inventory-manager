@@ -9,12 +9,14 @@ import (
 )
 
 // @Summary		Add item category
-// @Description	Adds a category for items to the inventory manager
+// @Description	Adds a category for items. Requires CreateTag or Administrator.
 // @Tags			Category
 // @Accept			json
 // @Param			body	body	CreateItemCategoryReq	true	"Category information (categoryName, parentID)"
 // @Success		201		"Item category created"
 // @Failure		400		"Invalid request body"
+// @Failure		401		"Not logged in"
+// @Failure		403		"Permission denied or invalid frontend Origin or Referer"
 // @Failure		500		"Error creating category"
 // @Router			/categories [post]
 func CreateCategory(c *gin.Context, db *gorm.DB) {

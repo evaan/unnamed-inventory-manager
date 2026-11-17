@@ -55,6 +55,15 @@ definitions:
     - manufacturerPart
     - quantity
     type: object
+  inventory.MoveCategoryReq:
+    properties:
+      parentID:
+        format: uuid
+        type: string
+        x-nullable: true
+    required:
+    - parentID
+    type: object
   inventory.UpdateItemReq:
     properties:
       categories:
@@ -153,7 +162,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Adds a category for items to the inventory manager
+      description: Adds a category for items. Requires CreateTag or Administrator.
       parameters:
       - description: Category information (categoryName, parentID)
         in: body
@@ -166,12 +175,42 @@ paths:
           description: Item category created
         "400":
           description: Invalid request body
+        "401":
+          description: Not logged in
+        "403":
+          description: Permission denied or invalid frontend Origin or Referer
         "500":
           description: Error creating category
       summary: Add item category
       tags:
       - Category
   /categories/{id}:
+    delete:
+      description: Removes the category from all items and makes its direct children
+        top-level categories. Requires DeleteTag or Administrator.
+      parameters:
+      - description: Item Category ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Category deleted
+        "400":
+          description: Invalid category ID
+        "401":
+          description: Not logged in
+        "403":
+          description: Permission denied or invalid frontend Origin or Referer
+        "404":
+          description: Category not found
+        "500":
+          description: Error deleting category
+      summary: Delete an item category
+      tags:
+      - Category
     get:
       consumes:
       - application/json
@@ -195,11 +234,45 @@ paths:
       summary: Get category
       tags:
       - Category
+    patch:
+      consumes:
+      - application/json
+      description: Set the parent of a category, or send null to make it a top-level
+        category. Requires CreateTag or Administrator.
+      parameters:
+      - description: Item Category ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New parent category ID or null
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/inventory.MoveCategoryReq'
+      responses:
+        "204":
+          description: Category moved
+        "400":
+          description: Invalid ID, invalid request body or circular category hierarchy
+        "401":
+          description: Not logged in
+        "403":
+          description: Permission denied or invalid frontend Origin or Referer
+        "404":
+          description: Category or parent category not found
+        "500":
+          description: Error moving category
+      summary: Move an item category
+      tags:
+      - Category
   /items:
     get:
       consumes:
       - application/json
-      description: Gets information for all items
+      description: Gets information for all items, including their categories
       responses:
         "200":
           description: Item information retrieved
@@ -256,7 +329,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Gets full information for one item
+      description: Gets full information for one item, including its categories
       parameters:
       - description: Item ID
         format: uuid
@@ -279,7 +352,8 @@ paths:
     put:
       consumes:
       - application/json
-      description: Update item information
+      description: Update item information and return its categories. Send category
+        IDs to replace the current categories, or an empty list to clear them.
       parameters:
       - description: Item ID
         format: uuid
