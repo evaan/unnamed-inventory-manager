@@ -58,48 +58,56 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 		public.GET("/whoami", func(c *gin.Context) {
 			auth.WhoAmI(c, db)
 		})
+	}
 
-		public.GET("/items", func(c *gin.Context) {
+	private := router.Group("/")
+	private.Use(middleware.AuthRequired(db))
+	{
+		private.GET("/permissions", func(c *gin.Context) {
+			auth.GetPermissions(c, db)
+		})
+
+		private.GET("/items", func(c *gin.Context) {
 			inventory.GetItems(c, db)
 		})
 
-		public.GET("/categories", func(c *gin.Context) {
+		private.GET("/categories", func(c *gin.Context) {
 			inventory.GetCategories(c, db)
 		})
 
-		public.GET("items/:id", func(c *gin.Context) {
+		private.GET("items/:id", func(c *gin.Context) {
 			inventory.GetItemByID(c, db)
 		})
 
-		public.GET("categories/:id", func(c *gin.Context) {
+		private.GET("categories/:id", func(c *gin.Context) {
 			inventory.GetCategoryByID(c, db)
 		})
 
-		public.POST("/categories", middleware.PermissionRequired(db, auth.PermissionCreateTag), func(c *gin.Context) {
+		private.POST("/categories", middleware.PermissionRequired(db, auth.PermissionCreateTag), func(c *gin.Context) {
 			inventory.CreateCategory(c, db)
 		})
 
-		public.PATCH("/categories/:id", middleware.PermissionRequired(db, auth.PermissionCreateTag), func(c *gin.Context) {
+		private.PATCH("/categories/:id", middleware.PermissionRequired(db, auth.PermissionCreateTag), func(c *gin.Context) {
 			inventory.MoveCategory(c, db)
 		})
 
-		public.DELETE("/categories/:id", middleware.PermissionRequired(db, auth.PermissionDeleteTag), func(c *gin.Context) {
+		private.DELETE("/categories/:id", middleware.PermissionRequired(db, auth.PermissionDeleteTag), func(c *gin.Context) {
 			inventory.DeleteCategory(c, db)
 		})
 
-		public.POST("/items", func(c *gin.Context) {
+		private.POST("/items", func(c *gin.Context) {
 			inventory.AddItem(c, db)
 		})
 
-		public.PUT("/items/:id", func(c *gin.Context) {
+		private.PUT("/items/:id", func(c *gin.Context) {
 			inventory.UpdateItem(c, db)
 		})
 
-		public.DELETE("/items/:id", func(c *gin.Context) {
+		private.DELETE("/items/:id", func(c *gin.Context) {
 			inventory.DeleteItem(c, db)
 		})
 
-		public.GET("/logs", func(c *gin.Context) {
+		private.GET("/logs", func(c *gin.Context) {
 			inventory.GetLogs(c, db)
 		})
 
@@ -110,14 +118,6 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 	{
 		session.POST("/logout", func(c *gin.Context) {
 			auth.Logout(c, db)
-		})
-	}
-
-	private := router.Group("/")
-	private.Use(middleware.AuthRequired(db))
-	{
-		private.GET("/permissions", func(c *gin.Context) {
-			auth.GetPermissions(c, db)
 		})
 	}
 
