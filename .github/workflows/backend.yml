@@ -14,7 +14,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-          cache: false
+          cache: true
+          cache-dependency-path: backend/go.sum
       - name: Build
         run: go build ./...
 
@@ -29,7 +30,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-          cache: false
+          cache: true
+          cache-dependency-path: backend/go.sum
       - name: Test
         run: go test ./... -v
 
@@ -44,7 +46,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-          cache: false
+          cache: true
+          cache-dependency-path: backend/go.sum
       - name: Check formatting
         run: |
           gofmt -l . | tee /tmp/fmt
@@ -63,7 +66,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-          cache: false
+          cache: true
+          cache-dependency-path: backend/go.sum
       - name: Install Swagger
         run: go install github.com/swaggo/swag/cmd/swag@latest
       - name: Check Swagger docs
