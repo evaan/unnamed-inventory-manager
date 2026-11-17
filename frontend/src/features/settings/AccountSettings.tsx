@@ -8,7 +8,7 @@ export const AccountSettings = () => {
   const { name, email, permissions } = auth.data;
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <section className={CARD}>
         <h2 className="text-base font-semibold">Your account</h2>
         <dl className="mt-3 space-y-3">
