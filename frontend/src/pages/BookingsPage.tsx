@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpRight, CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../features/auth/useAuth';
 import { hasPermission } from '../features/auth/auth';
@@ -10,7 +10,8 @@ import { BookingSkeleton } from '../features/bookings/BookingSkeleton';
 import { BookingSchedule } from '../features/bookings/BookingSchedule';
 import { BookingFilters } from '../features/bookings/BookingFilters';
 import { BookingPanel } from '../features/bookings/BookingPanel';
-import { equipmentHours, fmtDay, fmtTime, sameDay, startOfDay, toDateInput, weekDates } from '../features/bookings/bookingTime';
+import { ReservationDetails } from '../features/bookings/ReservationDetails';
+import { equipmentHours, fmtDay, fmtTime, sameDay, SLOT_HOURS, startOfDay, toDateInput, weekDates } from '../features/bookings/bookingTime';
 import { getEquipment, getBookings, createBooking, cancelBooking, updateBooking, createEquipment, updateEquipment, deleteEquipment, type Equipment, type Booking, type NewBooking, type NewEquipment } from '../features/bookings/bookingsapi';
 import { EquipmentEditor } from '../features/bookings/EquipmentEditor';
 import { canManageReservation } from '../features/bookings/bookingPermissions';
@@ -27,13 +28,13 @@ export const BookingsPage = () => {
   const canModify = hasPermission(auth.data, 'BookingModify');
   const canDelete = hasPermission(auth.data, 'BookingDelete');
   const canViewAll = hasPermission(auth.data, 'BookingManage');
+  const canManageEquipment = canModify || canDelete;
   const client = useQueryClient();
   const equipmentQuery = useQuery({ queryKey: ['equipment', session?.email], queryFn: getEquipment, enabled: !!session, retry: false });
   const bookingsKey = ['bookings', session?.email] as const;
   const bookingsQuery = useQuery({ queryKey: bookingsKey, queryFn: getBookings, enabled: !!session, retry: false, refetchInterval: 30_000 });
   const equipment = equipmentQuery.data ?? EMPTY_EQUIPMENT;
   const bookings = bookingsQuery.data ?? EMPTY_BOOKINGS;
-  const loading = equipmentQuery.isLoading || bookingsQuery.isLoading;
   const loadError = equipmentQuery.error ?? bookingsQuery.error;
   const retrying = equipmentQuery.isFetching || bookingsQuery.isFetching;
   const retry = () => { void equipmentQuery.refetch(); void bookingsQuery.refetch(); };
@@ -49,38 +50,61 @@ export const BookingsPage = () => {
   const [availableNow, setAvailableNow] = useState(false);
   const [requestedView, setView] = useState<'schedule' | 'mine' | 'all'>('schedule');
   const view = requestedView === 'all' && !canViewAll ? 'mine' : requestedView;
+  const loading = equipmentQuery.isLoading || bookingsQuery.isLoading;
   const [scheduleDate, setScheduleDate] = useState(() => toDateInput(new Date()));
   const [initialHour, setInitialHour] = useState<number | undefined>();
-  const [initialDuration, setInitialDuration] = useState(1);
+  const [initialDuration, setInitialDuration] = useState(SLOT_HOURS);
   const [panelVersion, setPanelVersion] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editingBooking, setEditingBooking] = useState<Booking | undefined>();
+  const [viewingBookingId, setViewingBookingId] = useState<number | null>(null);
   const [equipmentEditor, setEquipmentEditor] = useState<Equipment | 'new' | null>(null);
+  const editor = equipmentEditor && (equipmentEditor === 'new' ? canAdd : canManageEquipment) ? equipmentEditor : null;
   const mutationRef = useRef(false);
   const selected = equipment.find((eq) => eq.ID === selectedId) ?? null;
+  const viewingBooking = bookings.find((booking) => booking.ID === viewingBookingId);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(id);
   }, []);
 
-  const selectEquipment = (id: number | null, hour?: number, date?: string, duration = 1) => {
+  const selectEquipment = (id: number | null, hour?: number, date?: string, duration = SLOT_HOURS) => {
     if (saving) return;
     setError('');
+    setEquipmentEditor(null);
     setEditingBooking(undefined);
+    setViewingBookingId(null);
     if (date) setScheduleDate(date);
     setInitialHour(hour);
     setInitialDuration(duration);
     setPanelVersion((version) => version + 1);
     setSelectedId(id);
   };
+  const viewEquipment = (id: number) => {
+    if (saving || !canManageEquipment) return;
+    const item = equipment.find((eq) => eq.ID === id);
+    if (!item) return;
+    selectEquipment(null);
+    setEquipmentEditor(item);
+  };
+  const viewReservation = (booking: Booking) => {
+    if (saving) return;
+    selectEquipment(booking.EquipmentID);
+    setViewingBookingId(booking.ID);
+  };
   const changeScheduleDate = (value: string) => {
     if (saving) return;
     setSelectedId(null);
+    setEquipmentEditor(null);
     setScheduleDate(value);
   };
   const closeRef = useRef(() => selectEquipment(null));
-  closeRef.current = () => selectEquipment(null);
+  closeRef.current = () => {
+    if (saving) return;
+    if (editor) setEquipmentEditor(null);
+    else selectEquipment(null);
+  };
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented) closeRef.current(); };
     window.addEventListener('keydown', onKey);
@@ -150,6 +174,7 @@ export const BookingsPage = () => {
       client.setQueryData<Equipment[]>(['equipment', session.email], (previous) => previous?.filter((entry) => entry.ID !== item.ID));
       setBookings((previous) => previous.filter((booking) => booking.EquipmentID !== item.ID));
       setSelectedId(null);
+      setEquipmentEditor(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
@@ -175,6 +200,7 @@ export const BookingsPage = () => {
       await cancelBooking(id, session);
       setBookings((previous) => previous.filter((booking) => booking.ID !== id));
       if (editingBooking?.ID === id) { setEditingBooking(undefined); setPanelVersion((version) => version + 1); }
+      if (viewingBookingId === id) { setViewingBookingId(null); setSelectedId(null); }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
@@ -191,7 +217,7 @@ export const BookingsPage = () => {
   const visible = equipment.filter((eq) => {
     if (category && eq.Category !== category) return false;
     if (availableNow) {
-      const { open, close } = equipmentHours(eq.Category);
+      const { open, close } = equipmentHours(eq);
       if (!bookingsQuery.data || eq.Status !== 'ACTIVE' || now.getHours() < open || now.getHours() >= close ||
         (bookingsByEquipment.get(eq.ID) ?? []).some((booking) => new Date(booking.Start) <= now && new Date(booking.End) > now)) return false;
     }
@@ -225,7 +251,7 @@ export const BookingsPage = () => {
           </nav>
         </header>
         {loadError && <ErrorBanner message={loadError.message} onRetry={retry} retrying={retrying} />}
-        {error && !selected && <ErrorBanner message={error} onDismiss={() => setError('')} />}
+        {error && !selected && !editor && <ErrorBanner message={error} onDismiss={() => setError('')} />}
         <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           {view === 'schedule' && <>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -246,14 +272,14 @@ export const BookingsPage = () => {
             <div className="mb-3 flex justify-end text-xs text-slate-400">
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1.5"><span className="h-3 w-5 bg-slate-700" />Free</span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-5 bg-rose-500/70" />Booked</span>
-                <span className="flex items-center gap-1.5"><span className="h-3 w-5 bg-emerald-500/70" />Your booking</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-5 bg-rose-500/80" />Booked</span>
+                <span className="flex items-center gap-1.5"><span className="h-3 w-5 bg-emerald-500/80" />Your booking</span>
               </div>
             </div>
           </>}
           {loading ? <BookingSkeleton view={view} />
             : loadError && equipment.length === 0 ? <div className="ui-empty-state"><p>Equipment could not be loaded.</p></div>
-            : view !== 'schedule' ? (
+            : view === 'mine' || view === 'all' ? (
               <section aria-label={view === 'all' ? 'All bookings' : 'Your upcoming bookings'}>
                 {!bookingsQuery.data ? <p className="text-sm text-slate-400">{view === 'all' ? 'Bookings' : 'Your bookings'} could not be loaded. Try again above.</p>
                   : listedBookings.length === 0 ? <div className="ui-empty-state"><CalendarDays className="mb-2 h-6 w-6" /><p>{view === 'all' ? 'No current or upcoming bookings.' : 'No upcoming reservations yet.'}</p><button onClick={() => setView('schedule')} className="ui-button-secondary mt-2">View schedule</button></div>
@@ -263,6 +289,7 @@ export const BookingsPage = () => {
                       const start = new Date(booking.Start);
                       const end = new Date(booking.End);
                       const manageable = canManageReservation(auth.data, booking) && end > now;
+                      const editable = manageable && eq?.Status === 'ACTIVE' && start > now;
                       const bookingLabel = view === 'all' ? `${booking.Mine ? 'you' : booking.UserName} on ${eq?.Name ?? 'equipment'}` : eq?.Name ?? 'equipment';
                       return (
                         <li key={booking.ID} className="flex flex-wrap items-center gap-3 py-4">
@@ -272,8 +299,7 @@ export const BookingsPage = () => {
                             <p className="mt-1 text-xs text-slate-400">{fmtDay(start, now)} · {fmtTime(start)} – {!sameDay(start, end) && `${fmtDay(end, now)} · `}{fmtTime(end)}</p>
                             <p className="mt-1 text-xs text-slate-500">{eq?.Location}{booking.Purpose ? ` · ${booking.Purpose}` : ''}</p>
                           </div>
-                          {eq && <button disabled={saving} onClick={() => selectEquipment(eq.ID, undefined, toDateInput(start) < toDateInput(now) ? toDateInput(now) : toDateInput(start))} className="ui-icon-button" aria-label={`View booking for ${bookingLabel}`}><ArrowUpRight className="h-4 w-4" /></button>}
-                          {manageable && eq?.Status === 'ACTIVE' && start > now && <button aria-label={`Edit booking for ${bookingLabel}`} disabled={saving} onClick={() => editReservation(booking)} className="ui-icon-button"><Pencil className="h-4 w-4" /></button>}
+                          {eq && <button disabled={saving} onClick={() => editable ? editReservation(booking) : viewReservation(booking)} className="ui-icon-button" aria-label={`${editable ? 'Edit' : 'View'} booking for ${bookingLabel}`}><Pencil className="h-4 w-4" /></button>}
                           {manageable && <button aria-label={`Cancel booking for ${bookingLabel}`} disabled={saving} onClick={() => void cancel(booking.ID)} className="ui-button-secondary hover:!text-rose-300"><Trash2 className="h-4 w-4" />Cancel</button>}
                         </li>
                       );
@@ -285,13 +311,14 @@ export const BookingsPage = () => {
                 <p>{equipment.length === 0 ? 'No equipment yet.' : 'No equipment matches your filters.'}</p>
                 {filtering && <button onClick={() => { setQuery(''); setCategory(null); setAvailableNow(false); }} className="text-slate-200 hover:text-white">Clear filters</button>}
               </div>
-            ) : <BookingSchedule equipment={visible} bookings={bookingsByEquipment} day={day} now={now} selectedId={selectedId} loaded={bookingsQuery.data !== undefined} onSelect={(id, hour, duration) => selectEquipment(id, hour, undefined, duration)} />}
+            ) : <BookingSchedule equipment={visible} bookings={bookingsByEquipment} day={day} now={now} selectedId={editor && editor !== 'new' ? editor.ID : selectedId} loaded={bookingsQuery.data !== undefined} onSelect={(id, hour, duration) => selectEquipment(id, hour, undefined, duration)} onSelectBooking={viewReservation} onSelectEquipment={canManageEquipment ? viewEquipment : undefined} />}
         </div>
       </main>
-      <DetailPanel label="Equipment details" open={!!selected}>
-        {selected && <BookingPanel key={`${selected.ID}-${panelVersion}`} equipment={selected} initialDate={scheduleDate} initialHour={initialHour} initialDuration={initialDuration} bookings={bookingsByEquipment.get(selected.ID) ?? []} now={now} onClose={() => selectEquipment(null)} onBook={book} onCancel={cancel} onSavingChange={setSaving} error={error} onDismissError={() => setError('')} bookingsLoaded={bookingsQuery.data !== undefined} auth={session!} initialBooking={editingBooking} onUpdate={updateReservation} onEditEquipment={canModify ? () => setEquipmentEditor(selected) : undefined} onDeleteEquipment={canDelete ? () => void removeEquipment(selected) : undefined} busy={saving} />}
+      <DetailPanel label={editor ? editor === 'new' ? 'Add bookable equipment' : canModify ? 'Edit bookable equipment' : 'Bookable equipment' : viewingBooking ? 'Reservation details' : 'Equipment details'} open={!!editor || (!!selected && (viewingBookingId === null || !!viewingBooking))}>
+        {editor ? <EquipmentEditor key={editor === 'new' ? 'new' : editor.ID} equipment={editor === 'new' ? null : editor} categories={[...new Set(equipment.map((item) => item.Category))]} onSave={saveEquipment} onClose={() => { if (!saving) setEquipmentEditor(null); }} onSavingChange={setSaving} readOnly={editor !== 'new' && !canModify} busy={saving} errorMessage={error} onDelete={editor !== 'new' && canDelete ? () => void removeEquipment(editor) : undefined} />
+          : selected && viewingBooking ? <ReservationDetails equipment={selected} booking={viewingBooking} auth={session!} now={now} busy={saving} error={error} onDismissError={() => setError('')} onClose={() => selectEquipment(null)} onEdit={() => editReservation(viewingBooking)} onCancel={() => void cancel(viewingBooking.ID)} />
+          : selected && <BookingPanel key={`${selected.ID}-${panelVersion}`} equipment={selected} initialDate={scheduleDate} initialHour={initialHour} initialDuration={initialDuration} bookings={bookingsByEquipment.get(selected.ID) ?? []} now={now} onClose={() => selectEquipment(null)} onBook={book} onCancel={cancel} onSavingChange={setSaving} error={error} onDismissError={() => setError('')} bookingsLoaded={bookingsQuery.data !== undefined} auth={session!} initialBooking={editingBooking} onUpdate={updateReservation} busy={saving} />}
       </DetailPanel>
-      {equipmentEditor && (equipmentEditor === 'new' ? canAdd : canModify) && <EquipmentEditor equipment={equipmentEditor === 'new' ? null : equipmentEditor} categories={[...new Set(equipment.map((item) => item.Category))]} onSave={saveEquipment} onClose={() => setEquipmentEditor(null)} onSavingChange={setSaving} />}
     </Workspace>
   );
 };

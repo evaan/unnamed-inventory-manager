@@ -1,11 +1,3 @@
-// Item API client for the Unnamed Inventory Manager API (Go/gin backend).
-// Auth is a session cookie set by /login -> /callback, so every request sends credentials.
-//
-// Note the backend's naming split:
-//   - request bodies use camelCase (CreateItemReq / UpdateItemReq have json tags)
-//   - responses use PascalCase, because the Go `Item` struct has no json tags
-// The app uses camelCase everywhere, so responses are converted in `fromServer` below.
-
 import type { Tag } from './tagsapi';
 
 const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/+$/, '');

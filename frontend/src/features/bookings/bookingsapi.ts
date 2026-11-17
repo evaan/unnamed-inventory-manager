@@ -1,6 +1,6 @@
 // Demo equipment booking API backed by in-memory data (changes reset on reload).
 // A real API must derive permissions/ownership from its server session, never client-supplied auth or Mine.
-import { bookingError, equipmentHours } from './bookingTime';
+import { bookingError, equipmentHours, equipmentHoursError } from './bookingTime';
 import { hasPermission, type AuthState } from '../auth/auth';
 import { canManageReservation } from './bookingPermissions';
 
@@ -14,6 +14,9 @@ export interface Equipment {
   Description: string;
   Status: EquipmentStatus; // MAINTENANCE = can't be booked
   MaintenanceNote?: string;
+  // Daily local working hours; absent values retain category defaults for demo data.
+  OpenHour?: number;
+  CloseHour?: number;
 }
 
 export type NewEquipment = Omit<Equipment, 'ID'>;
@@ -100,7 +103,7 @@ const generateBookings = (): Booking[] => {
 
   for (const eq of equipment) {
     if (eq.Status !== 'ACTIVE') continue;
-    const { open, close } = equipmentHours(eq.Category);
+    const { open, close } = equipmentHours(eq);
     for (let day = 0; day < 7; day++) {
       const count = Math.floor(rand() * 3); // 0-2 bookings per day
       for (let n = 0; n < count; n++) {
@@ -142,10 +145,15 @@ const equipmentValues = (item: NewEquipment): NewEquipment => {
     throw new Error('Name, category, and location are required.');
   }
   if (!['ACTIVE', 'MAINTENANCE'].includes(item.Status)) throw new Error('Invalid equipment status.');
+  const hoursItem = { ...item, Category: item.Category.trim() };
+  const hoursError = equipmentHoursError(hoursItem);
+  if (hoursError) throw new Error(hoursError);
+  const { open, close } = equipmentHours(hoursItem);
   return {
     Name: item.Name.trim(), Category: item.Category.trim(), Location: item.Location.trim(),
     Description: item.Description.trim(), Status: item.Status,
     MaintenanceNote: item.Status === 'MAINTENANCE' ? item.MaintenanceNote?.trim() : '',
+    OpenHour: open, CloseHour: close,
   };
 };
 

@@ -49,10 +49,8 @@ const BLANK_ITEM: Item = {
 const byName = (a: Tag, b: Tag) => a.Name.localeCompare(b.Name, undefined, { sensitivity: 'base' });
 const tagIdsOf = (item: TaggedItem) => (item.Tags ?? []).map((t) => t.ID);
 
-/* ---------- Page ---------- */
 export const MainPage = () => {
   const confirm = useConfirm();
-  /* Auth */
   const auth = useAuth();
   const canCreateItem = hasPermission(auth.data, 'CreateItem');
   const canDeleteItem = hasPermission(auth.data, 'DeleteItem');
@@ -61,7 +59,6 @@ export const MainPage = () => {
   const canDeleteTags = hasPermission(auth.data, 'DeleteTag');
   const canEditTags = hasPermission(auth.data, 'ModifyItem');
 
-  /* Data */
   const session = auth.data?.loggedIn && !auth.data.disabled ? auth.data : null;
   const { items, tags, itemsLoaded, tagsLoaded, setItems, setTags, cancelItems, cancelTags, loading, loadError, retrying, retry } =
     useInventoryData(session?.email, !!session);
@@ -77,13 +74,11 @@ export const MainPage = () => {
   const canLeave = useUnsavedChanges(dirty, saving);
   const [query, setQuery] = useState('');
 
-  /* Sidebar */
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [activeTagIds, setActiveTagIds] = useState<TagID[]>([]);
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : 'Something went wrong');
 
-  /* Spotlight + new-item draft */
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Item | null>(null); // unsaved new item, never sent to the API until saved
   const spotlightItem =
@@ -226,8 +221,6 @@ export const MainPage = () => {
       setSaving(false);
     }
   };
-
-  /* Tags */
 
   // POST /tags. Tag names are unique (case-insensitive), so an existing match is reused.
   const createTagByName = async (raw: string): Promise<Tag | null> => {
