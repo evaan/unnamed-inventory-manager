@@ -26,8 +26,8 @@ export const BookingSkeleton = ({ view }: { view: 'schedule' | 'mine' | 'all' })
                       <div className="h-2.5 w-16 rounded bg-slate-800/60" />
                     </div>
                   </div>
-                  <div className="grid flex-1 grid-cols-[repeat(24,minmax(0,1fr))] gap-1 p-1">
-                    {Array.from({ length: 24 }, (_, hour) => <div key={hour} className="my-2 h-11 rounded-md bg-slate-800/60" />)}
+                  <div className="grid flex-1 grid-cols-[repeat(48,minmax(0,1fr))] gap-1 p-1">
+                    {Array.from({ length: 48 }, (_, slot) => <div key={slot} className="my-2 h-11 rounded-md bg-slate-800/60" />)}
                   </div>
                 </div>
               ))}
