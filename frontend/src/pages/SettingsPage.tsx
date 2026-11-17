@@ -38,7 +38,7 @@ export const SettingsPage = () => {
       </div>
       <main className={usersPage
         ? 'relative flex min-h-0 flex-1 overflow-hidden'
-        : 'mx-auto w-full max-w-6xl flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8'}>
+        : 'mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8'}>
         <Routes>
           <Route index element={<AccountSettings />} />
           <Route path="users" element={admin ? <UsersSettings currentEmail={auth.data.email} /> : <Navigate to="/app/settings" replace />} />

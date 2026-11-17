@@ -105,7 +105,7 @@ export const AppSettings = () => {
   );
 
   return (
-    <section className="max-w-3xl space-y-5">
+    <section className="space-y-5">
       <div>
         <h2 className="text-base font-semibold">App settings</h2>
         <p className="mt-1 text-sm text-slate-400">Global configuration shared by everyone.</p>
