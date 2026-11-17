@@ -701,3 +701,43 @@ func TestGetCategories(t *testing.T) {
 		t.Errorf("Couldn't find testCategory2 ID")
 	}
 }
+
+func TestGetCategoryByID(t *testing.T) {
+
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db, "View")
+
+	testCategory1 := inventory.ItemCategory{
+		ID:           uuid.New(),
+		CategoryName: "testCategory1",
+	}
+
+	if err := db.Create(&testCategory1).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	response := makeRequest(router, http.MethodGet, "/categories/"+testCategory1.ID.String(), "", token)
+
+	// Ensure HTTP response is correct
+	requireStatus(t, response, http.StatusOK)
+
+	var result struct {
+		Category inventory.ItemCategory `json:"itemCategory"`
+	}
+
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatalf("Can't decode item created: %v", err)
+	}
+
+	var retrievedCategory inventory.ItemCategory
+
+	// Ensure category was successfullly added to the database
+	if err := db.First(&retrievedCategory, "id = ?", result.Category.ID).Error; err != nil {
+		t.Fatalf("Created category wasn't found in the database: %v", err)
+	}
+
+	// Ensure the properties of the retrieved category match all the properties of the one added to the database
+	if retrievedCategory.CategoryName != "testCategory1" {
+		t.Errorf("Expected Name: testCategory1 | Actual Value: %q", retrievedCategory.CategoryName)
+	}
+}
