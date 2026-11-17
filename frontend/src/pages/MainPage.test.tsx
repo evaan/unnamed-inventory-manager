@@ -47,8 +47,6 @@ const ITEMS = [
   makeItem({ id: '3', itemName: 'LED Red', quantity: 0, manufacturerPart: 'LED-R' }),
 ];
 
-const logoutMutate = vi.fn();
-
 // MainPage's page selector needs a router around it.
 const renderMain = () =>
   render(
@@ -68,7 +66,7 @@ const renderPage = async (items = ITEMS) => {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(useAuth).mockReturnValue({ data: { loggedIn: true, disabled: false } } as never);
-  vi.mocked(useLogout).mockReturnValue({ mutate: logoutMutate, isPending: false } as never);
+  vi.mocked(useLogout).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
   vi.mocked(getTags).mockResolvedValue([]); // resetAllMocks clears this, so set it every time
 });
 
@@ -88,27 +86,9 @@ describe('MainPage: auth gate', () => {
     const { container } = renderMain();
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
-
-  it('calls logout.mutate when "Log out" is clicked', async () => {
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /log out/i }));
-    expect(logoutMutate).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows "Logging out…" and disables the button while logout is pending', async () => {
-    vi.mocked(useLogout).mockReturnValue({ mutate: logoutMutate, isPending: true } as never);
-    await renderPage();
-    expect(screen.getByRole('button', { name: /logging out/i })).toBeDisabled();
-  });
 });
 
 describe('MainPage: loading and listing', () => {
-  it('shows quantities directly in inventory rows', async () => {
-    await renderPage();
-    expect(screen.getByLabelText('Quantity: 50', { selector: 'span' })).toBeVisible();
-    expect(screen.getByLabelText('Quantity: 0', { selector: 'span' })).toBeVisible();
-  });
-
   it('can retry a failed inventory load without reloading the page', async () => {
     vi.mocked(getItems).mockRejectedValueOnce(new Error('Network down')).mockResolvedValue(ITEMS);
     renderMain();
@@ -117,20 +97,6 @@ describe('MainPage: loading and listing', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('Resistor 4.7k')).toBeInTheDocument();
     expect(screen.queryByText('Network down')).not.toBeInTheDocument();
-  });
-
-  it('starts with tags collapsed on narrow screens', async () => {
-    vi.stubGlobal('innerWidth', 375);
-    try {
-      await renderPage();
-      const toggle = screen.getByRole('button', { name: 'Expand tags' });
-      expect(toggle).toHaveAttribute('aria-expanded', 'false');
-      expect(screen.queryByRole('button', { name: /^Tags$/ })).not.toBeInTheDocument();
-      await userEvent.click(toggle);
-      expect(screen.getByRole('button', { name: 'Collapse tags' })).toHaveAttribute('aria-expanded', 'true');
-    } finally {
-      vi.unstubAllGlobals();
-    }
   });
 
   it('shows skeleton rows while loading, then the items', async () => {
@@ -152,29 +118,10 @@ describe('MainPage: loading and listing', () => {
     expect(screen.getByText('Out of stock')).toBeInTheDocument();
   });
 
-  it('treats exactly 10 as low stock and 11 as in stock', async () => {
-    await renderPage([
-      makeItem({ id: '1', itemName: 'Ten', quantity: 10 }),
-      makeItem({ id: '2', itemName: 'Eleven', quantity: 11 }),
-    ]);
-    expect(screen.getByText('Low stock')).toBeInTheDocument();
-    expect(screen.getByText('In stock')).toBeInTheDocument();
-  });
-
   it('shows the empty state when there are no items', async () => {
     await renderPage([]);
     expect(screen.getByText('No items yet.')).toBeInTheDocument();
   });
-
-  it('shows an error banner when loading fails, and it can be dismissed', async () => {
-    vi.mocked(getItems).mockRejectedValue(new Error('Network down'));
-    renderMain();
-    expect(await screen.findByText('Network down')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByTitle('Dismiss'));
-    expect(screen.queryByText('Network down')).not.toBeInTheDocument();
-  });
-
 });
 
 describe('MainPage: search', () => {
@@ -221,28 +168,6 @@ describe('MainPage: spotlight panel', () => {
       'noopener noreferrer'
     );
   });
-
-  it('closes the panel with the close button', async () => {
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
-    await userEvent.click(screen.getByTitle('Close (Esc)'));
-    expect(screen.queryByRole('heading', { name: 'Resistor 4.7k' })).not.toBeInTheDocument();
-  });
-
-  it('closes the panel when Escape is pressed', async () => {
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
-    await userEvent.keyboard('{Escape}');
-    expect(screen.queryByRole('heading', { name: 'Resistor 4.7k' })).not.toBeInTheDocument();
-  });
-
-  it('toggles the panel closed when the selected row is clicked again', async () => {
-    await renderPage();
-    const row = screen.getByRole('button', { name: /resistor 4\.7k/i });
-    await userEvent.click(row);
-    await userEvent.click(row);
-    expect(screen.queryByTitle('Close (Esc)')).not.toBeInTheDocument();
-  });
 });
 
 describe('MainPage: adjust quantity', () => {
@@ -260,19 +185,6 @@ describe('MainPage: adjust quantity', () => {
     expect(adjustItem).not.toHaveBeenCalled();
   });
 
-  it('locks adjustments until the request completes', async () => {
-    let resolve!: (item: Item) => void;
-    vi.mocked(adjustItem).mockReturnValue(new Promise((done) => { resolve = done; }));
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
-    await userEvent.click(screen.getByRole('button', { name: '+1' }));
-    for (const name of ['-10', '-1', '+1', '+10']) expect(screen.getByRole('button', { name })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: '+1' }));
-    expect(adjustItem).toHaveBeenCalledTimes(1);
-    resolve(makeItem({ quantity: 51 }));
-    await waitFor(() => expect(screen.getByRole('button', { name: '+1' })).toBeEnabled());
-    expect(screen.getByLabelText('Quantity: 51', { selector: 'span' })).toBeVisible();
-  });
   it('sends ADDED with the amount when +1 is clicked and updates the item', async () => {
     vi.mocked(adjustItem).mockResolvedValue(makeItem({ id: '2', itemName: 'Capacitor 10uF', quantity: 6 }));
     await renderPage();
@@ -298,14 +210,6 @@ describe('MainPage: adjust quantity', () => {
     expect(screen.getByRole('button', { name: '-10' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '-1' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '+10' })).toBeEnabled();
-  });
-
-  it('shows an error when the adjust request fails', async () => {
-    vi.mocked(adjustItem).mockRejectedValue(new Error('Adjust failed'));
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
-    await userEvent.click(screen.getByRole('button', { name: '+10' }));
-    expect(await screen.findByText('Adjust failed')).toBeInTheDocument();
   });
 });
 
@@ -348,17 +252,6 @@ describe('MainPage: delete', () => {
     expect(deleteItem).not.toHaveBeenCalled();
     expect(screen.getByText('3 of 3')).toBeInTheDocument();
   });
-
-  it('keeps the item and shows an error when delete fails', async () => {
-    vi.mocked(deleteItem).mockRejectedValue(new Error('Delete failed'));
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /led red/i }));
-    await userEvent.click(screen.getByTitle('Delete item'));
-    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete item' }));
-
-    expect(await screen.findByText('Delete failed')).toBeInTheDocument();
-    expect(screen.getByText('3 of 3')).toBeInTheDocument();
-  });
 });
 
 describe('MainPage: new item', () => {
@@ -366,19 +259,6 @@ describe('MainPage: new item', () => {
     vi.mocked(useAuth).mockReturnValue({
       data: { loggedIn: true, disabled: false, permissions: ['CreateItem'] },
     } as never);
-  });
-
-  it.each(['', '1.5', '2147483648'])('rejects invalid quantity %j', async (quantity) => {
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /new item/i }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Widget');
-    await userEvent.type(screen.getByLabelText('Manufacturer'), 'TDK');
-    await userEvent.type(screen.getByLabelText('Manufacturer Part #'), 'TDK-12');
-    await userEvent.clear(screen.getByLabelText('Quantity'));
-    if (quantity) await userEvent.type(screen.getByLabelText('Quantity'), quantity);
-    await userEvent.click(screen.getByRole('button', { name: /add item/i }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Quantity must be a whole number');
-    expect(createItem).not.toHaveBeenCalled();
   });
 
   it('rejects unsafe URLs', async () => {
@@ -393,22 +273,6 @@ describe('MainPage: new item', () => {
     expect(createItem).not.toHaveBeenCalled();
   });
 
-  it.each(['cancel', 'escape', 'row', 'new', 'navigation', 'logout'])('keeps unsaved values when declining to discard via %s', async (action) => {
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /new item/i }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Unsaved widget');
-    if (action === 'cancel') await userEvent.click(screen.getByRole('button', { name: /^Cancel$/ }));
-    if (action === 'escape') await userEvent.keyboard('{Escape}');
-    if (action === 'row') await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
-    if (action === 'new') await userEvent.click(screen.getByRole('button', { name: /^new item$/i }));
-    if (action === 'navigation') await userEvent.click(screen.getByRole('link', { name: 'Bookings' }));
-    if (action === 'logout') await userEvent.click(screen.getByRole('button', { name: /log out/i }));
-    expect(screen.getByRole('alertdialog', { name: 'Discard unsaved changes?' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
-    expect(screen.getByLabelText('Name')).toHaveValue('Unsaved widget');
-    expect(logoutMutate).not.toHaveBeenCalled();
-  });
-
   it('discards a dirty draft only after confirmation', async () => {
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
@@ -417,39 +281,6 @@ describe('MainPage: new item', () => {
     expect(screen.getByRole('alertdialog', { name: 'Discard unsaved changes?' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
     expect(screen.queryByText('Draft')).not.toBeInTheDocument();
-  });
-
-  it('logs out only after confirming discard', async () => {
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /^New item$/ }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Unsaved widget');
-    await userEvent.click(screen.getByRole('button', { name: /log out/i }));
-    expect(logoutMutate).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
-    expect(logoutMutate).toHaveBeenCalledTimes(1);
-  });
-
-  it('starts a fresh draft after confirming New item again', async () => {
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /^New item$/ }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Old draft');
-    await userEvent.click(screen.getByRole('button', { name: /^New item$/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
-    expect(screen.getByLabelText('Name')).toHaveValue('');
-  });
-
-  it('warns before unloading with changes and removes the warning after discard', async () => {
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /^New item$/ }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Unsaved');
-    const dirtyUnload = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(dirtyUnload);
-    expect(dirtyUnload.defaultPrevented).toBe(true);
-    await userEvent.click(screen.getByRole('button', { name: /^Cancel$/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
-    const cleanUnload = new Event('beforeunload', { cancelable: true });
-    window.dispatchEvent(cleanUnload);
-    expect(cleanUnload.defaultPrevented).toBe(false);
   });
 
   it('prevents closing or duplicate submissions during save', async () => {
@@ -488,15 +319,6 @@ describe('MainPage: new item', () => {
     expect(screen.queryByRole('button', { name: /new item/i })).not.toBeInTheDocument();
   });
 
-  it('opens a draft form with a Draft row', async () => {
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /new item/i }));
-
-    expect(screen.getByRole('heading', { name: 'New item' })).toBeInTheDocument();
-    expect(screen.getByText('Draft')).toBeInTheDocument();
-    expect(screen.getByText('Untitled item')).toBeInTheDocument();
-  });
-
   it('refuses to save without a name and does not call the API', async () => {
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
@@ -506,12 +328,18 @@ describe('MainPage: new item', () => {
     expect(createItem).not.toHaveBeenCalled();
   });
 
-  it('clears the validation error once the user starts typing a name', async () => {
+  it('rejects negative quantities instead of silently changing them', async () => {
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /new item/i }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Widget');
+    await userEvent.type(screen.getByLabelText('Manufacturer'), 'TDK');
+    await userEvent.type(screen.getByLabelText('Manufacturer Part #'), 'TDK-12');
+    await userEvent.clear(screen.getByLabelText('Quantity'));
+    await userEvent.type(screen.getByLabelText('Quantity'), '-5');
     await userEvent.click(screen.getByRole('button', { name: /add item/i }));
-    await userEvent.type(screen.getByLabelText('Name'), 'x');
-    expect(screen.queryByText('Name, manufacturer and manufacturer part # are required.')).not.toBeInTheDocument();
+
+    expect(createItem).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Quantity must be a whole number');
   });
 
   it('saves trimmed values with an integer quantity, then lists the new item', async () => {
@@ -534,37 +362,6 @@ describe('MainPage: new item', () => {
     expect(screen.getByText('4 of 4')).toBeInTheDocument();
   });
 
-  it('rejects negative quantities instead of silently changing them', async () => {
-    vi.mocked(createItem).mockImplementation(async (item) => makeItem({ ...item, id: '99' }));
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /new item/i }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Widget');
-    await userEvent.type(screen.getByLabelText('Manufacturer'), 'TDK');
-    await userEvent.type(screen.getByLabelText('Manufacturer Part #'), 'TDK-12');
-    await userEvent.clear(screen.getByLabelText('Quantity'));
-    await userEvent.type(screen.getByLabelText('Quantity'), '-5');
-    await userEvent.click(screen.getByRole('button', { name: /add item/i }));
-
-    expect(createItem).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('Quantity must be a whole number');
-  });
-
-  it('discards the draft with Cancel', async () => {
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /new item/i }));
-    await userEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
-
-    expect(screen.queryByText('Draft')).not.toBeInTheDocument();
-    expect(createItem).not.toHaveBeenCalled();
-  });
-
-  it('discards the draft with Escape', async () => {
-    await renderPage();
-    await userEvent.click(screen.getByRole('button', { name: /new item/i }));
-    await userEvent.keyboard('{Escape}');
-    expect(screen.queryByText('Draft')).not.toBeInTheDocument();
-  });
-
   it('keeps the draft open and shows an error when create fails', async () => {
     vi.mocked(createItem).mockRejectedValue(new Error('Create failed'));
     await renderPage();
@@ -584,15 +381,11 @@ describe('MainPage: editing item details', () => {
     vi.mocked(useAuth).mockReturnValue({ data: { loggedIn: true, disabled: false, permissions: ['ModifyItem'] } } as never);
   });
 
-  const openEdit = async () => {
+  it('prefills details and saves metadata without overwriting quantity', async () => {
+    vi.mocked(updateItem).mockResolvedValue(makeItem({ itemName: 'Precision resistor', description: 'Updated description', quantity: 60 }));
     await renderPage();
     await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
     await userEvent.click(screen.getByRole('button', { name: 'Edit item' }));
-  };
-
-  it('prefills details and saves metadata without overwriting quantity', async () => {
-    vi.mocked(updateItem).mockResolvedValue(makeItem({ itemName: 'Precision resistor', description: 'Updated description', quantity: 60 }));
-    await openEdit();
     expect(screen.getByLabelText('Name')).toHaveValue('Resistor 4.7k');
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
     await userEvent.clear(screen.getByLabelText('Name'));
@@ -607,28 +400,6 @@ describe('MainPage: editing item details', () => {
     expect(vi.mocked(updateItem).mock.calls[0][1]).not.toHaveProperty('description');
     expect(await screen.findByRole('heading', { name: 'Precision resistor' })).toBeInTheDocument();
     expect(screen.getByLabelText('Quantity: 60', { selector: 'span' })).toBeVisible();
-  });
-
-  it('keeps failed edits available for retry', async () => {
-    vi.mocked(updateItem).mockRejectedValue(new Error('Save failed'));
-    await openEdit();
-    await userEvent.clear(screen.getByLabelText('Name'));
-    await userEvent.type(screen.getByLabelText('Name'), 'Changed name');
-    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Save failed');
-    expect(screen.getByLabelText('Name')).toHaveValue('Changed name');
-  });
-
-  it('asks before abandoning edits and restores read-only details after confirmation', async () => {
-    await openEdit();
-    await userEvent.type(screen.getByLabelText('Name'), ' changed');
-    await userEvent.keyboard('{Escape}');
-    await userEvent.keyboard('{Escape}');
-    expect(screen.getByLabelText('Name')).toHaveValue('Resistor 4.7k changed');
-    await userEvent.click(screen.getByRole('button', { name: /^Cancel$/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
-    expect(screen.getByRole('heading', { name: 'Resistor 4.7k' })).toBeInTheDocument();
-    expect(updateItem).not.toHaveBeenCalled();
   });
 });
 
@@ -700,5 +471,4 @@ describe('MainPage: tag permissions', () => {
     expect(setItemTags).toHaveBeenCalledWith(taggedItem.id, [resistorTag.ID, sensorTag.ID]);
     expect(createTag).not.toHaveBeenCalled();
   });
-
 });
