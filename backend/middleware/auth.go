@@ -117,6 +117,10 @@ func requireSession(db *gorm.DB, allowDisabled bool) gin.HandlerFunc {
 }
 
 func AdminRequired(db *gorm.DB) gin.HandlerFunc {
+	return PermissionRequired(db, auth.PermissionAdministrator)
+}
+
+func PermissionRequired(db *gorm.DB, permission string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, err := auth.GetUser(c)
 		if err != nil {
@@ -124,13 +128,13 @@ func AdminRequired(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		isAdmin, err := auth.IsAdmin(db.WithContext(c.Request.Context()), user)
+		allowed, err := auth.HasPermission(db.WithContext(c.Request.Context()), user, permission)
 		if err != nil {
 			c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
 
-		if !isAdmin {
+		if !allowed {
 			c.AbortWithStatus(http.StatusForbidden)
 			return
 		}

@@ -11,6 +11,8 @@ const (
 	PermissionCreateItem    = "CreateItem"
 	PermissionDeleteItem    = "DeleteItem"
 	PermissionModifyItem    = "ModifyItem"
+	PermissionCreateTag     = "CreateTag"
+	PermissionDeleteTag     = "DeleteTag"
 	PermissionBookingAdd    = "BookingAdd"
 	PermissionBookingModify = "BookingModify"
 	PermissionBookingDelete = "BookingDelete"

@@ -1,5 +1,7 @@
 import type { Item } from './itemsapi';
 
+export const MAX_ITEM_QUANTITY = 2_147_483_647;
+
 type Stock = 'In stock' | 'Low stock' | 'Out of stock';
 export const getStock = (item: Item): Stock =>
   item.quantity === 0 ? 'Out of stock' : item.quantity <= 10 ? 'Low stock' : 'In stock';

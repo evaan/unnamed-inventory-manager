@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getItems, type Item } from './itemsapi';
 import { getTags, type Tag } from './tagsapi';
@@ -8,12 +9,16 @@ export function useInventoryData(email: string | undefined, enabled: boolean) {
   const tagsKey = ['inventory', email, 'tags'] as const;
   const itemsQuery = useQuery({ queryKey: itemsKey, queryFn: getItems, enabled, retry: false });
   const tagsQuery = useQuery({ queryKey: tagsKey, queryFn: getTags, enabled, retry: false });
+  const tags = useMemo(
+    () => [...(tagsQuery.data ?? [])].sort((a, b) => a.Name.localeCompare(b.Name, undefined, { sensitivity: 'base' })),
+    [tagsQuery.data]
+  );
 
   return {
     items: itemsQuery.data ?? [],
     itemsLoaded: itemsQuery.data !== undefined,
     tagsLoaded: tagsQuery.data !== undefined,
-    tags: [...(tagsQuery.data ?? [])].sort((a, b) => a.Name.localeCompare(b.Name, undefined, { sensitivity: 'base' })),
+    tags,
     setItems: (update: (items: Item[]) => Item[]) => client.setQueryData<Item[]>(itemsKey, (previous) => update(previous ?? [])),
     setTags: (update: (tags: Tag[]) => Tag[]) => client.setQueryData<Tag[]>(tagsKey, (previous) => update(previous ?? [])),
     cancelItems: () => client.cancelQueries({ queryKey: itemsKey }),
