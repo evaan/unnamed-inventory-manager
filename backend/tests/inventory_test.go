@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"testing"
+	"time"
 	"uuid"
 
 	"gorm.io/gorm"
@@ -13,6 +14,49 @@ import (
 	"github.com/evaandev/unnamed-inventory-manager/auth"
 	"github.com/evaandev/unnamed-inventory-manager/inventory"
 )
+
+func TestInventoryReadsRequireActiveSession(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, activeToken := newTestSession(t, db)
+	disabled, disabledToken := newTestSession(t, db, auth.PermissionAdministrator)
+	if err := db.Model(&disabled).Update("disabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	_, expiredToken := newTestSession(t, db)
+	if err := db.Model(&auth.UserSession{}).
+		Where("session_token = ?", auth.HashToken(expiredToken)).
+		Update("expires", time.Now().Add(-time.Hour)).Error; err != nil {
+		t.Fatal(err)
+	}
+	category := inventory.ItemCategory{ID: uuid.New(), CategoryName: "Private category"}
+	item := inventory.Item{ID: uuid.New(), ItemName: "Private item"}
+	if err := db.Create(&category).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	for _, path := range []string{"/items", "/items/" + item.ID.String(), "/categories", "/categories/" + category.ID.String(), "/logs"} {
+		t.Run(path, func(t *testing.T) {
+			for _, test := range []struct {
+				name   string
+				token  string
+				status int
+			}{
+				{"anonymous", "", http.StatusUnauthorized},
+				{"invalid", "invalid-session", http.StatusUnauthorized},
+				{"expired", expiredToken, http.StatusUnauthorized},
+				{"disabled", disabledToken, http.StatusForbidden},
+				{"active", activeToken, http.StatusOK},
+			} {
+				t.Run(test.name, func(t *testing.T) {
+					requireStatus(t, makeRequest(router, http.MethodGet, path, "", test.token), test.status)
+				})
+			}
+		})
+	}
+}
 
 func TestAddItem(t *testing.T) {
 
@@ -526,13 +570,13 @@ func TestAttachCategoryByUpdatingItem(t *testing.T) {
 
 	itemPath := "/items/" + testItemToEdit.ID.String()
 	editedItem := result.Item
-	response = makeRequest(router, http.MethodGet, itemPath, "", "")
+	response = makeRequest(router, http.MethodGet, itemPath, "", adminToken)
 	requireStatus(t, response, http.StatusOK)
 	result.Item = inventory.Item{}
 	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	response = makeRequest(router, http.MethodGet, "/items", "", "")
+	response = makeRequest(router, http.MethodGet, "/items", "", adminToken)
 	requireStatus(t, response, http.StatusOK)
 	var list struct {
 		Items []inventory.Item `json:"items"`

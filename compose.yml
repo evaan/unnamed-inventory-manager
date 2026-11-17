@@ -6,13 +6,33 @@ services:
     restart: always
     command:
       - --providers.docker=true
+      - --providers.docker.endpoint=tcp://docker-socket-proxy:2375
+      - --providers.docker.network=inventory_default
       - --providers.docker.exposedbydefault=false
       - --providers.docker.constraints=Label(`com.docker.compose.project`, `inventory`)
       - --entrypoints.web.address=:80
     ports:
       - "8980:80"
+    depends_on:
+      - docker-socket-proxy
+    networks:
+      - default
+      - docker-api
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:lts
+    restart: always
+    environment:
+      CONTAINERS: "1"
+      NETWORKS: "1"
+      EVENTS: "1"
+      PING: "1"
+      VERSION: "1"
+      POST: "0"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - docker-api
 
   frontend:
     build:
@@ -66,3 +86,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+networks:
+  docker-api:
+    internal: true
