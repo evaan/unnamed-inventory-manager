@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"gitlab.com/evaandev/unnamed-inventory-manager/database"
+	"gitlab.com/evaandev/unnamed-inventory-manager/email"
 	"gitlab.com/evaandev/unnamed-inventory-manager/routes"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -65,11 +66,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := routes.Register(router, db, oauthCfg, frontendURL); err != nil {
+	// TODO add real values
+	eDialer := email.CreateEmailDialer("", 1, "", "")
+
+	if err := routes.Register(router, db, oauthCfg, eDialer, frontendURL); err != nil {
 		log.Fatal(err)
 	}
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal(err)
 	}
+
 }

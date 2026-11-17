@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
+	"gitlab.com/evaandev/unnamed-inventory-manager/email"
 	"gitlab.com/evaandev/unnamed-inventory-manager/routes"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -453,7 +454,10 @@ func newAuthRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	if err := routes.Register(router, db, oauthCfg, testFrontendURL); err != nil {
+
+	// TODO replace with real values or with test email dialer
+	eDialer := email.CreateEmailDialer("", 1, "", "")
+	if err := routes.Register(router, db, oauthCfg, eDialer, testFrontendURL); err != nil {
 		t.Fatal(err)
 	}
 

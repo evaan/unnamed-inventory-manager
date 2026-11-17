@@ -15,10 +15,11 @@ import (
 	"gitlab.com/evaandev/unnamed-inventory-manager/inventory"
 	"gitlab.com/evaandev/unnamed-inventory-manager/middleware"
 	"golang.org/x/oauth2"
+	"gopkg.in/gomail.v2"
 	"gorm.io/gorm"
 )
 
-func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontendURL string) error {
+func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, eDialer *gomail.Dialer, frontendURL string) error {
 	frontend, err := url.Parse(frontendURL)
 	if err != nil || frontend.Host == "" || (frontend.Scheme != "http" && frontend.Scheme != "https") {
 		return errors.New("FRONTEND_URL must be an absolute HTTP or HTTPS URL")
@@ -71,7 +72,7 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 		})
 
 		public.PUT("/items/:id", func(c *gin.Context) {
-			inventory.UpdateItem(c, db)
+			inventory.UpdateItem(c, db, eDialer)
 		})
 
 		public.DELETE("/items/:id", func(c *gin.Context) {
@@ -121,6 +122,10 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 
 		admin.GET("/users", func(c *gin.Context) {
 			auth.GetUsers(c, db)
+		})
+
+		admin.PUT("/request/:id", func(c *gin.Context) {
+			inventory.UpdateRequest(c, db, eDialer)
 		})
 	}
 

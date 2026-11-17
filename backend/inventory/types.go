@@ -13,6 +13,7 @@ type Item struct {
 	Quantity         int32     `gorm:"type:integer;not null"`
 	Manufacturer     string    `gorm:"not null"`
 	ManufacturerPart string    `gorm:"not null"`
+	NeedRequest      bool      `gorm:"default:false"`
 	DistributorPart  string    // Digikey or McMaster part number
 	DistributorURL   string
 	DataSheetURL     string
@@ -31,14 +32,43 @@ type Changelog struct {
 	Description string
 }
 
+type Request struct {
+	ID                       int       `gorm:"primaryKey;autoIncrement"`
+	UserID                   uuid.UUID `gorm:"type:uuid;not null"`
+	ItemID                   uuid.UUID `gorm:"type:uuid;not null"`
+	Item                     Item      `gorm:"foreignKey:ItemID;references:ID;constraint:OnDelete:RESTRICT"`
+	OldQuantity              int32     `gorm:"not null"`
+	ProposedQuantity         *int32
+	Action                   ChangelogAction `gorm:"type:varchar(20);not null"`
+	ProposedItemName         *string
+	ProposedManufacturer     *string
+	ProposedManufacturerPart *string
+	ProposedDistributorPart  *string
+	ProposedDistributorURL   *string
+	ProposedDataSheetURL     *string
+	ProposedItemDescription  *string
+	ChangeTime               time.Time       `gorm:"not null"`
+	Approved                 ApprovedRequest `gorm:"not null"`
+	Description              *string
+}
+
 type ChangelogAction string
 
 const (
-	ItemCreated  ChangelogAction = "CREATE"
-	ItemTaken    ChangelogAction = "TAKEN"
-	ItemAdded    ChangelogAction = "ADDED"
-	ItemModified ChangelogAction = "MODIFIED"
-	ItemDeleted  ChangelogAction = "DELETE"
+	ItemCreated   ChangelogAction = "CREATE"
+	ItemTaken     ChangelogAction = "TAKEN"
+	ItemAdded     ChangelogAction = "ADDED"
+	ItemModified  ChangelogAction = "MODIFIED"
+	ItemRequested ChangelogAction = "REQUESTED"
+	ItemDeleted   ChangelogAction = "DELETE"
+)
+
+type ApprovedRequest string
+
+const (
+	RequestApproved ApprovedRequest = "APPROVED"
+	RequestDenied   ApprovedRequest = "DENIED"
+	RequestPending  ApprovedRequest = "PENDING"
 )
 
 type UpdateItemReq struct {
@@ -58,11 +88,16 @@ type CreateItemReq struct {
 	Quantity         *int32 `json:"quantity" binding:"required"`
 	Manufacturer     string `json:"manufacturer" binding:"required"`
 	ManufacturerPart string `json:"manufacturerPart" binding:"required"`
+	NeedRequest      bool   `json:"needRequest"`
 	DistributorPart  string `json:"distributorPart"`
 	DistributorURL   string `json:"distributorURL"`
 	DataSheetURL     string `json:"dataSheetURL"`
 	Description      string `json:"description"`
 	LogDescription   string `json:"logDescription"`
+}
+
+type UpdateRequestForItem struct {
+	ChangeAuthorized bool `json:"changeAuthorized"`
 }
 
 type ItemDTO struct {
