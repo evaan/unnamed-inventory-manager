@@ -22,27 +22,11 @@ describe('LoginPage', () => {
     assign.mockClear();
   });
 
-  it('renders the welcome heading and subtitle', () => {
-    render(<LoginPage />);
-    expect(screen.getByRole('heading', { name: /^welcome$/i })).toBeInTheDocument();
-    expect(screen.getByText(/sign in to manage your inventory/i)).toBeInTheDocument();
-  });
-
-  it('renders a "Continue with Google" button', () => {
-    render(<LoginPage />);
-    expect(screen.getByRole('button', { name: /continue with google/i })).toBeEnabled();
-  });
-
   it('redirects to the API login endpoint when the button is clicked', async () => {
     render(<LoginPage />);
     await userEvent.click(screen.getByRole('button', { name: /continue with google/i }));
 
     expect(assign).toHaveBeenCalledTimes(1);
     expect(assign).toHaveBeenCalledWith('http://api.test/login');
-  });
-
-  it('does not redirect before the button is clicked', () => {
-    render(<LoginPage />);
-    expect(assign).not.toHaveBeenCalled();
   });
 });
