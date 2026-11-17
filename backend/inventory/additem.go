@@ -25,6 +25,17 @@ func AddItem(c *gin.Context, db *gorm.DB) {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
+
+	hasPermission, err := auth.HasPermission(db.WithContext(c.Request.Context()), user, auth.PermissionCreateItem)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	if !hasPermission {
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+
 	// TODO: make creation of log and item one db transaction
 	var req CreateItemReq
 	if err := c.ShouldBindJSON(&req); err != nil {

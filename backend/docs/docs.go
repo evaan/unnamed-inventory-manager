@@ -396,7 +396,7 @@ const docTemplate = `{
                 }
             },
             "put": {
-                "description": "Replace the user's permissions, or send an empty list to clear them. Admin only, using the session cookie",
+                "description": "Replace the user's permissions, or send an empty list to clear them. Admin only, using the session cookie. Administrators cannot remove their own Administrator permission.",
                 "consumes": [
                     "application/json"
                 ],
@@ -440,7 +440,7 @@ const docTemplate = `{
                         "description": "Not logged in"
                     },
                     "403": {
-                        "description": "Not an administrator or invalid frontend Origin or Referer"
+                        "description": "Not an administrator, removing own Administrator permission, or invalid frontend Origin or Referer"
                     },
                     "404": {
                         "description": "User not found"
@@ -479,6 +479,61 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Error getting settings"
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a new named setting with a string value. Existing names are rejected. Admin only, using the session cookie",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Create a setting",
+                "parameters": [
+                    {
+                        "description": "New setting name and string value",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/settings.CreateSettingRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Setting created",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "value": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body, empty name, or missing string value"
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Not an administrator, user disabled, or invalid frontend Origin or Referer"
+                    },
+                    "409": {
+                        "description": "Setting already exists"
+                    },
+                    "500": {
+                        "description": "Error creating setting"
                     }
                 }
             },
@@ -841,6 +896,17 @@ const docTemplate = `{
                 },
                 "quantity": {
                     "type": "integer"
+                }
+            }
+        },
+        "settings.CreateSettingRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
                 }
             }
         },

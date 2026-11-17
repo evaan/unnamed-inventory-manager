@@ -6,7 +6,16 @@ import (
 	"github.com/google/uuid"
 )
 
-const PermissionAdministrator = "Administrator"
+const (
+	PermissionAdministrator = "Administrator"
+	PermissionCreateItem    = "CreateItem"
+	PermissionDeleteItem    = "DeleteItem"
+	PermissionModifyItem    = "ModifyItem"
+	PermissionBookingAdd    = "BookingAdd"
+	PermissionBookingModify = "BookingModify"
+	PermissionBookingDelete = "BookingDelete"
+	PermissionBookingManage = "BookingManage"
+)
 
 type User struct {
 	ID                uuid.UUID `gorm:"type:uuid;primaryKey"`

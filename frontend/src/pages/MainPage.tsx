@@ -1,26 +1,35 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Truck, Search, X, Plus, Trash2 } from 'lucide-react';
-import { useAuth, useLogout } from '../features/auth/useAuth';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Plus } from 'lucide-react';
+import { useAuth } from '../features/auth/useAuth';
+import { hasPermission } from '../features/auth/auth';
 import {
-  getItems,
   createItem,
   adjustItem,
   deleteItem,
+  updateItem,
   type Item,
   type NewItem,
 } from '../features/items/itemsapi';
+import {
+  createTag,
+  deleteTag,
+  setItemTags,
+  type Tag,
+  type TagID,
+  type WithTags,
+} from '../features/items/tagsapi';
+import { DetailPanel, Workspace } from '../components/Workspace';
+import { SearchInput } from '../components/SearchInput';
+import { ErrorBanner } from '../components/ErrorBanner';
+import { ListSkeleton } from '../components/ListSkeleton';
+import { ItemDetails } from '../features/items/ItemDetails';
+import { getStock, STOCK_STYLES } from '../features/items/itemStock';
+import { useInventoryData } from '../features/items/useInventoryData';
+import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
+import { useConfirm } from '../hooks/useConfirm';
+import { TagChip, TagEditor, TagSidebar } from '../features/items/ItemTags';
 
-type Stock = 'In stock' | 'Low stock' | 'Out of stock';
-
-// Stock status is derived from quantity, not stored.
-const getStock = (item: Item): Stock =>
-  item.quantity === 0 ? 'Out of stock' : item.quantity <= 10 ? 'Low stock' : 'In stock'; // static threshold TODO: add dynamic for assign2
-
-const STOCK_STYLES: Record<Stock, string> = {
-  'In stock': 'bg-emerald-500/15 text-emerald-300',
-  'Low stock': 'bg-amber-500/15 text-amber-300',
-  'Out of stock': 'bg-rose-500/15 text-rose-300',
-};
+type TaggedItem = WithTags<Item>;
 
 // Unsaved new items live under this ID until the API assigns a real one.
 const DRAFT_ID = '__draft__';
@@ -37,306 +46,42 @@ const BLANK_ITEM: Item = {
   description: '',
 };
 
-// While editing, quantity is kept as a string so the input can be empty mid-typing.
-type Draft = Record<Exclude<keyof NewItem, 'logDescription'>, string>;
-
-const toDraft = (i: Item): Draft => ({
-  itemName: i.itemName,
-  quantity: String(i.quantity),
-  manufacturer: i.manufacturer,
-  manufacturerPart: i.manufacturerPart,
-  distributorPart: i.distributorPart ?? '',
-  distributorURL: i.distributorURL ?? '',
-  dataSheetURL: i.dataSheetURL ?? '',
-  description: i.description ?? '',
-});
-
-const toCount = (s: string) => Math.max(0, Math.floor(Number(s) || 0));
-
-const fromDraft = (d: Draft): NewItem => ({
-  itemName: d.itemName.trim(),
-  quantity: toCount(d.quantity),
-  manufacturer: d.manufacturer.trim(),
-  manufacturerPart: d.manufacturerPart.trim(),
-  distributorPart: d.distributorPart.trim(),
-  distributorURL: d.distributorURL.trim(),
-  dataSheetURL: d.dataSheetURL.trim(),
-  description: d.description.trim(),
-});
-
-const INPUT =
-  'w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm placeholder:text-slate-600 focus:outline-none focus:border-indigo-500';
-
-const Field = ({
-  label,
-  className = '',
-  children,
-}: {
-  label: string;
-  className?: string;
-  children: React.ReactNode;
-}) => (
-  <label className={`block ${className}`}>
-    <span className="block text-xs text-slate-500 mb-1">{label}</span>
-    {children}
-  </label>
-);
-
-// Read-only row in the spotlight
-const Detail = ({ label, children }: { label: string; children: React.ReactNode }) => (
-  <div>
-    <p className="text-xs text-slate-500 mb-0.5">{label}</p>
-    <div className="text-sm break-words">{children}</div>
-  </div>
-);
-
-const ExternalLinkText = ({ url, text }: { url: string; text: string }) => (
-  <a
-    href={url}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="text-indigo-400 hover:text-indigo-300 underline-offset-2 hover:underline"
-  >
-    {text}
-  </a>
-);
-
-// New-item form (existing items have no edit endpoint, only quantity changes)
-const NewItemForm = ({
-  item,
-  saving,
-  onSave,
-  onCancel,
-}: {
-  item: Item;
-  saving: boolean;
-  onSave: (item: NewItem) => void;
-  onCancel: () => void;
-}) => {
-  const [d, setD] = useState<Draft>(() => toDraft(item));
-  const [error, setError] = useState('');
-
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
-    setD((prev) => ({ ...prev, [key]: value }));
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // The API rejects empty values for these three.
-    if (!d.itemName.trim() || !d.manufacturer.trim() || !d.manufacturerPart.trim()) {
-      setError('Name, manufacturer and manufacturer part # are required.');
-      return;
-    }
-    onSave(fromDraft(d));
-  };
-
-  return (
-    <form onSubmit={submit} className="flex flex-col flex-1 min-h-0">
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-        <section className="grid grid-cols-2 gap-3">
-          <Field label="Name" className="col-span-2">
-            <input
-              autoFocus
-              value={d.itemName}
-              onChange={(e) => {
-                set('itemName', e.target.value);
-                setError('');
-              }}
-              placeholder="e.g. 4.7 kΩ resistor, 0805"
-              className={INPUT}
-            />
-          </Field>
-          <Field label="Quantity" className="col-span-2">
-            <input value={d.quantity} onChange={(e) => set('quantity', e.target.value)} className={INPUT} />
-          </Field>
-          <Field label="Manufacturer" className="col-span-2">
-            <input value={d.manufacturer} onChange={(e) => set('manufacturer', e.target.value)} className={INPUT} />
-          </Field>
-          <Field label="Manufacturer Part #" className="col-span-2">
-            <input value={d.manufacturerPart} onChange={(e) => set('manufacturerPart', e.target.value)} className={INPUT} />
-          </Field>
-          <Field label="Distributor Part #" className="col-span-2">
-            <input value={d.distributorPart} onChange={(e) => set('distributorPart', e.target.value)} className={INPUT} />
-          </Field>
-          <Field label="Distributor URL" className="col-span-2">
-            <input value={d.distributorURL} onChange={(e) => set('distributorURL', e.target.value)} className={INPUT} />
-          </Field>
-          <Field label="Data Sheet URL" className="col-span-2">
-            <input value={d.dataSheetURL} onChange={(e) => set('dataSheetURL', e.target.value)} className={INPUT} />
-          </Field>
-          <Field label="Description" className="col-span-2">
-            <input value={d.description} onChange={(e) => set('description', e.target.value)} className={INPUT} />
-          </Field>
-        </section>
-
-        {error && <p className="text-sm text-rose-300">{error}</p>}
-      </div>
-
-      <div className="px-5 py-3 border-t border-slate-800 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={saving}
-          className="px-3 py-1.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500 hover:bg-blue-400 disabled:opacity-50 text-sm font-medium text-white transition-colors shrink-0"
-        >
-          {saving ? 'Adding…' : 'Add item'}
-        </button>
-      </div>
-    </form>
-  );
-};
-
-// Spotlight panel
-interface SpotlightProps {
-  item: Item;
-  isDraft: boolean;
-  saving: boolean;
-  onClose: () => void;
-  onCancel: () => void;
-  onSave: (item: NewItem) => void;
-  onAdjust: (id: string, delta: number) => void;
-  onDelete: (id: string) => void;
-}
-
-const SpotlightPanel = ({
-  item,
-  isDraft,
-  saving,
-  onClose,
-  onCancel,
-  onSave,
-  onAdjust,
-  onDelete,
-}: SpotlightProps) => {
-  const stock = getStock(item);
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="px-5 pt-4 pb-3 flex items-start justify-between gap-3 border-b border-slate-800">
-        <div className="min-w-0">
-          {isDraft ? (
-            <h2 className="text-base font-semibold leading-snug">New item</h2>
-          ) : (
-            <>
-              <h2 className="text-base font-semibold leading-snug mt-0.5">{item.itemName}</h2>
-              <p className="text-xs text-slate-400 font-mono mt-1">{item.manufacturerPart}</p>
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-1 -mr-1.5 shrink-0">
-          {!isDraft && (
-            <button
-              onClick={() => {
-                if (window.confirm(`Delete "${item.itemName}"? This can't be undone.`)) onDelete(item.id);
-              }}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors"
-              title="Delete item"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            onClick={isDraft ? onCancel : onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            title={isDraft ? 'Cancel (Esc)' : 'Close (Esc)'}
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {isDraft ? (
-        <NewItemForm item={item} saving={saving} onSave={onSave} onCancel={onCancel} />
-      ) : (
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-          <section>
-            <div className="flex items-baseline justify-between">
-              <p className="text-2xl font-semibold tabular-nums">{item.quantity.toLocaleString()}</p>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${STOCK_STYLES[stock]}`}>{stock}</span>
-            </div>
-
-            <div className="mt-3 grid grid-cols-4 gap-2">
-              {[-10, -1, 1, 10].map((delta) => (
-                <button
-                  key={delta}
-                  onClick={() => onAdjust(item.id, delta)}
-                  disabled={delta < 0 && item.quantity < Math.abs(delta)}
-                  className="py-1.5 rounded-lg text-sm bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-800 transition-colors tabular-nums"
-                >
-                  {delta > 0 ? `+${delta}` : delta}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="space-y-4">
-            {item.manufacturer && (
-              <Detail label="Manufacturer">
-                <span className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-slate-500 shrink-0" />
-                  {item.manufacturer}
-                </span>
-              </Detail>
-            )}
-            {item.distributorPart && (
-              <Detail label="Distributor part #">
-                <span className="font-mono text-xs">{item.distributorPart}</span>
-              </Detail>
-            )}
-            {item.description && <Detail label="Description">{item.description}</Detail>}
-            {(item.distributorURL || item.dataSheetURL) && (
-              <Detail label="Links">
-                <div className="flex flex-col gap-1">
-                  {item.distributorURL && <ExternalLinkText url={item.distributorURL} text="Distributor page" />}
-                  {item.dataSheetURL && <ExternalLinkText url={item.dataSheetURL} text="Data sheet" />}
-                </div>
-              </Detail>
-            )}
-          </section>
-        </div>
-      )}
-    </div>
-  );
-};
+const byName = (a: Tag, b: Tag) => a.Name.localeCompare(b.Name, undefined, { sensitivity: 'base' });
+const tagIdsOf = (item: TaggedItem) => (item.Tags ?? []).map((t) => t.ID);
 
 /* ---------- Page ---------- */
 export const MainPage = () => {
+  const confirm = useConfirm();
   /* Auth */
   const auth = useAuth();
-  const logout = useLogout();
+  const canCreateItem = hasPermission(auth.data, 'CreateItem');
+  const canDeleteItem = hasPermission(auth.data, 'DeleteItem');
+  const canModifyItem = hasPermission(auth.data, 'ModifyItem');
+  const canCreateTags = hasPermission(auth.data, 'CreateTag');
+  const canDeleteTags = hasPermission(auth.data, 'DeleteTag');
+  const canEditTags = hasPermission(auth.data, 'ModifyItem');
 
   /* Data */
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
+  const session = auth.data?.loggedIn && !auth.data.disabled ? auth.data : null;
+  const { items, tags, itemsLoaded, tagsLoaded, setItems, setTags, cancelItems, cancelTags, loading, loadError, retrying, retry } =
+    useInventoryData(session?.email, !!session);
+  const [dismissedLoadError, setDismissedLoadError] = useState<Error | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const adjustingRef = useRef(new Set<string>());
+  const [adjustingIds, setAdjustingIds] = useState<string[]>([]);
+  const [dirty, setDirty] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [formVersion, setFormVersion] = useState(0);
+  const canLeave = useUnsavedChanges(dirty, saving);
   const [query, setQuery] = useState('');
 
-  const fail = (e: unknown) => setError(e instanceof Error ? e.message : 'Something went wrong');
+  /* Sidebar */
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
+  const [activeTagIds, setActiveTagIds] = useState<TagID[]>([]);
 
-  // GET /items
-  useEffect(() => {
-    let cancelled = false;
-    getItems()
-      .then((result) => {
-        if (!cancelled) setItems(result);
-      })
-      .catch((e) => {
-        if (!cancelled) fail(e);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const fail = (e: unknown) => setError(e instanceof Error ? e.message : 'Something went wrong');
 
   /* Spotlight + new-item draft */
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -344,17 +89,27 @@ export const MainPage = () => {
   const spotlightItem =
     selectedId === DRAFT_ID ? draft : items.find((i) => i.id === selectedId) ?? null;
 
-  const selectItem = (id: string | null) => {
+  const selectItem = async (id: string | null) => {
+    if (!await canLeave()) return;
     if (id !== DRAFT_ID) setDraft(null);
+    setDirty(false);
+    setEditing(false);
+    setError('');
     setSelectedId(id);
   };
 
-  const cancelDraft = () => {
-    setDraft(null);
-    setSelectedId(null);
+  const cancelForm = async () => {
+    if (!await canLeave()) return;
+    setDirty(false);
+    setError('');
+    if (editing) setEditing(false);
+    else {
+      setDraft(null);
+      setSelectedId(null);
+    }
   };
 
-  const onEscape = () => (draft ? cancelDraft() : selectItem(null));
+  const onEscape = () => (draft || editing ? cancelForm() : selectItem(null));
   const onEscapeRef = useRef(onEscape);
   onEscapeRef.current = onEscape;
 
@@ -366,60 +121,193 @@ export const MainPage = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const addItem = () => {
+  const addItem = async () => {
+    if (!canCreateItem || !itemsLoaded || !await canLeave()) return;
+    setDirty(false);
+    setEditing(false);
+    setError('');
+    setFormVersion((version) => version + 1);
     setDraft({ ...BLANK_ITEM });
     setSelectedId(DRAFT_ID);
   };
 
   // POST /items
-  const saveNew = async (item: NewItem) => {
+  const saveNew = async (item: NewItem, tagIds: TagID[]) => {
+    if (!canCreateItem || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setError('');
     try {
-      const created = await createItem(item);
-      setItems((prev) => [created, ...prev]);
+      await cancelItems();
+      const created: TaggedItem = await createItem(item);
+      let finalItem = created;
+      if (canEditTags && tagIds.length > 0) {
+        try {
+          finalItem = { ...created, Tags: await setItemTags(created.id, tagIds) };
+        } catch (e) {
+          fail(e); // item exists, only the tags failed; the user can retag from the spotlight
+        }
+      }
+      setItems((prev) => [finalItem, ...prev]);
       setDraft(null);
+      setDirty(false);
       setSelectedId(created.id);
     } catch (e) {
       fail(e);
     } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+
+  const saveEdit = async (values: NewItem) => {
+    if (!canModifyItem || !selectedId || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setError('');
+    try {
+      await cancelItems();
+      // Omit quantity: editing metadata must not overwrite stock changed elsewhere.
+      const updated = await updateItem(selectedId, {
+        itemName: values.itemName,
+        manufacturer: values.manufacturer,
+        manufacturerPart: values.manufacturerPart,
+        distributorPart: values.distributorPart,
+        distributorURL: values.distributorURL,
+        dataSheetURL: values.dataSheetURL,
+        itemDescription: values.description,
+      });
+      setItems((previous) => previous.map((item) => item.id === updated.id ? { ...item, ...updated, Tags: updated.Tags ?? item.Tags } : item));
+      setDirty(false);
+      setEditing(false);
+    } catch (e) {
+      fail(e);
+    } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
 
   // PUT /items/{id}  (new quantity + logDescription, computed in adjustItem)
   const adjustQuantity = async (id: string, delta: number) => {
+    if (!canModifyItem || adjustingRef.current.has(id)) return;
+    adjustingRef.current.add(id);
+    setAdjustingIds([...adjustingRef.current]);
     setError('');
     try {
+      await cancelItems();
       const updated = await adjustItem(id, delta > 0 ? 'ADDED' : 'TAKEN', Math.abs(delta));
-      setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, ...updated, Tags: updated.Tags ?? i.Tags } : i))
+      );
     } catch (e) {
       fail(e);
+    } finally {
+      adjustingRef.current.delete(id);
+      setAdjustingIds([...adjustingRef.current]);
     }
   };
 
   // DELETE /items/{id}
   const removeItem = async (id: string) => {
+    if (!canDeleteItem || savingRef.current || adjustingRef.current.has(id)) return;
+    savingRef.current = true;
+    setSaving(true);
     setError('');
     try {
+      await cancelItems();
       await deleteItem(id);
       setItems((prev) => prev.filter((i) => i.id !== id));
       setSelectedId(null);
     } catch (e) {
       fail(e);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
+  /* Tags */
+
+  // POST /tags. Tag names are unique (case-insensitive), so an existing match is reused.
+  const createTagByName = async (raw: string): Promise<Tag | null> => {
+    if (!canCreateTags || !tagsLoaded) return null;
+    const name = raw.trim();
+    if (!name) return null;
+    const existing = tags.find((t) => t.Name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+    setError('');
+    try {
+      await cancelTags();
+      const tag = await createTag(name);
+      setTags((prev) => [...prev, tag].sort(byName));
+      return tag;
+    } catch (e) {
+      fail(e);
+      return null;
+    }
+  };
+
+  // DELETE /tags/:id
+  const removeTag = async (tag: Tag) => {
+    if (!canDeleteTags) return;
+    if (!await confirm({
+      title: 'Delete tag?',
+      message: `Delete the tag "${tag.Name}"? It will be removed from every item.`,
+      confirmLabel: 'Delete tag',
+      destructive: true,
+    })) return;
+    setError('');
+    try {
+      await Promise.all([cancelItems(), cancelTags()]);
+      await deleteTag(tag.ID);
+      setTags((prev) => prev.filter((t) => t.ID !== tag.ID));
+      setItems((prev) => prev.map((i) => ({ ...i, Tags: (i.Tags ?? []).filter((t) => t.ID !== tag.ID) })));
+      setActiveTagIds((prev) => prev.filter((id) => id !== tag.ID));
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  // PUT /items/:id/tags
+  const updateItemTags = async (id: string, tagIds: TagID[]) => {
+    if (!canEditTags || !tagsLoaded) return;
+    setError('');
+    try {
+      await cancelItems();
+      const newTags = await setItemTags(id, tagIds);
+      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, Tags: newTags } : i)));
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  const toggleActiveTag = (id: TagID) =>
+    setActiveTagIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
+
+  const tagCounts = useMemo(() => {
+    const counts = new Map<TagID, number>();
+    for (const item of items) for (const t of item.Tags ?? []) counts.set(t.ID, (counts.get(t.ID) ?? 0) + 1);
+    return counts;
+  }, [items]);
+
+  // Selected tags narrow the list: an item must have all of them.
   const visibleItems = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (item) =>
-        item.itemName.toLowerCase().includes(q) || item.manufacturerPart.toLowerCase().includes(q)
-    );
-  }, [items, query]);
+    return items.filter((item) => {
+      const ids = tagIdsOf(item);
+      if (!activeTagIds.every((id) => ids.includes(id))) return false;
+      if (!q) return true;
+      return (
+        item.itemName.toLowerCase().includes(q) ||
+        item.manufacturerPart.toLowerCase().includes(q) ||
+        (item.Tags ?? []).some((t) => t.Name.toLowerCase().includes(q))
+      );
+    });
+  }, [items, query, activeTagIds]);
 
-  const rows = draft ? [draft, ...visibleItems] : visibleItems;
+  const rows = draft ? [draft as TaggedItem, ...visibleItems] : visibleItems;
+  const filtering = query.trim() !== '' || activeTagIds.length > 0;
 
   // Must stay below all hooks above (rules of hooks).
   if (!auth.data?.loggedIn || auth.data.disabled) {
@@ -427,56 +315,86 @@ export const MainPage = () => {
   }
 
   return (
-    <div className="h-screen bg-slate-950 text-slate-100 flex overflow-hidden font-sans selection:bg-indigo-500 selection:text-white">
+    <Workspace onBeforeLeave={canLeave}>
+      {/* Left: tag sidebar */}
+      <TagSidebar
+        open={sidebarOpen}
+        onToggleOpen={() => setSidebarOpen((o) => !o)}
+        tags={tags}
+        counts={tagCounts}
+        totalItems={items.length}
+        activeIds={activeTagIds}
+        canCreateTags={canCreateTags && tagsLoaded}
+        canDeleteTags={canDeleteTags}
+        onToggleTag={toggleActiveTag}
+        onClearTags={() => setActiveTagIds([])}
+        onCreate={createTagByName}
+        onDelete={removeTag}
+      />
+
       {/* Main: rowed list */}
       <main className="flex-1 flex flex-col bg-slate-950 overflow-hidden min-w-0">
-        <header className="border-b border-slate-800 bg-slate-900/50 px-6 py-3 flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
+        <div className="ui-toolbar">
+          <div className="w-full min-w-0 sm:w-auto sm:flex-1 sm:max-w-md">
+            <SearchInput
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name or part number"
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
+              onChange={setQuery}
+              placeholder="Search name, part number or tag"
+              label="Search inventory"
             />
           </div>
-          <span className="ml-auto text-sm text-slate-500 shrink-0">
+          <span className="ml-auto text-xs text-slate-400 shrink-0 tabular-nums">
             {visibleItems.length} of {items.length}
           </span>
-          <button
-            onClick={addItem}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500 hover:bg-blue-400 text-sm font-medium text-white transition-colors shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            New item
-          </button>
-          <button
-            onClick={() => logout.mutate()}
-            disabled={logout.isPending}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500 hover:bg-blue-400 text-sm font-medium text-white transition-colors shrink-0"
-          >
-            {logout.isPending ? 'Logging out…' : 'Log out'}
-          </button>
-        </header>
-
-        {error && (
-          <div className="px-6 py-2 bg-rose-500/10 border-b border-rose-500/20 text-sm text-rose-300 flex items-center justify-between gap-3">
-            <span>{error}</span>
-            <button onClick={() => setError('')} className="p-0.5 hover:text-rose-100" title="Dismiss">
-              <X className="w-4 h-4" />
+          {canCreateItem && (
+            <button
+              onClick={addItem}
+              disabled={!itemsLoaded || saving}
+              className="ui-button-primary"
+            >
+              <Plus className="w-4 h-4" />
+              New item
             </button>
+          )}
+        </div>
+
+        {loadError && loadError !== dismissedLoadError && (
+          <ErrorBanner message={loadError.message} onRetry={retry} retrying={retrying} onDismiss={() => setDismissedLoadError(loadError)} />
+        )}
+        {error && !spotlightItem && <ErrorBanner message={error} onDismiss={() => setError('')} />}
+
+        {/* Active tag filters, visible even when the sidebar is collapsed */}
+        {activeTagIds.length > 0 && (
+          <div className="px-4 sm:px-6 py-2 border-b border-slate-800 flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-slate-500 mr-1">Filtering by</span>
+            {tags
+              .filter((t) => activeTagIds.includes(t.ID))
+              .map((t) => (
+                <TagChip key={t.ID} tag={t} onRemove={() => toggleActiveTag(t.ID)} />
+              ))}
           </div>
         )}
 
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="h-full flex items-center justify-center text-slate-500 text-sm">Loading items…</div>
+            <ListSkeleton label="Loading items" />
+          ) : loadError && items.length === 0 ? (
+            <div className="ui-empty-state">
+              <p>Inventory could not be loaded.</p>
+              {loadError === dismissedLoadError && <button onClick={retry} disabled={retrying} className="ui-button-secondary">Try again</button>}
+            </div>
           ) : rows.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-500 text-sm">
-              <p>{items.length === 0 ? 'No items yet.' : 'No items match your search.'}</p>
-              {query && (
-                <button onClick={() => setQuery('')} className="text-indigo-400 hover:text-indigo-300">
-                  Clear search
+            <div className="ui-empty-state">
+              <p>{items.length === 0 ? 'No items yet.' : 'No items match your filters.'}</p>
+              {filtering && (
+                <button
+                  onClick={() => {
+                    setQuery('');
+                    setActiveTagIds([]);
+                  }}
+                  className="text-slate-200 hover:text-white"
+                >
+                  Clear search and tags
                 </button>
               )}
             </div>
@@ -484,6 +402,7 @@ export const MainPage = () => {
             <ul className="divide-y divide-slate-800/80">
               {rows.map((item) => {
                 const stock = getStock(item);
+                const itemTags = item.Tags ?? [];
                 const isSelected = item.id === selectedId;
                 const isDraft = item.id === DRAFT_ID;
                 const subtitle = [item.manufacturerPart, item.distributorPart].filter(Boolean).join(' · ');
@@ -494,10 +413,10 @@ export const MainPage = () => {
                         if (!isDraft) selectItem(isSelected ? null : item.id);
                       }}
                       aria-pressed={isSelected}
-                      className={`w-full px-6 py-3.5 flex items-center gap-4 text-left border-l-2 transition-colors ${
+                      className={`ui-list-row ${
                         isSelected
-                          ? 'bg-indigo-500/10 border-indigo-400'
-                          : 'border-transparent hover:bg-slate-900/60'
+                          ? 'ui-list-row-active'
+                          : 'ui-list-row-idle'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
@@ -505,14 +424,23 @@ export const MainPage = () => {
                           {item.itemName || 'Untitled item'}
                         </p>
                         <p className="text-xs text-slate-500 truncate">{subtitle || 'No details yet'}</p>
+                        {itemTags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {itemTags.slice(0, 3).map((t) => (
+                              <TagChip key={t.ID} tag={t} />
+                            ))}
+                            {itemTags.length > 3 && (
+                              <span className="text-xs text-slate-500 px-1 py-0.5">+{itemTags.length - 3}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-                          isDraft ? 'bg-slate-800 text-slate-300' : STOCK_STYLES[stock]
-                        }`}
-                      >
-                        {isDraft ? 'Draft' : stock}
-                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        {!isDraft && <span aria-label={`Quantity: ${item.quantity.toLocaleString()}`} className="text-sm font-semibold tabular-nums">{item.quantity.toLocaleString()}</span>}
+                        <span className={isDraft ? 'ui-badge bg-slate-800 text-slate-300' : STOCK_STYLES[stock]}>
+                          {isDraft ? 'Draft' : stock}
+                        </span>
+                      </div>
                     </button>
                   </li>
                 );
@@ -523,27 +451,31 @@ export const MainPage = () => {
       </main>
 
       {/* Spotlight: opens on the far right when a row is selected */}
-      <aside
-        className={`shrink-0 bg-slate-900 overflow-hidden transition-[width] duration-200 ${
-          spotlightItem ? 'w-96 border-l border-slate-800' : 'w-0'
-        }`}
-      >
-        <div className="w-96 h-full">
-          {spotlightItem && (
-            <SpotlightPanel
-              key={spotlightItem.id}
-              item={spotlightItem}
-              isDraft={spotlightItem.id === DRAFT_ID}
-              saving={saving}
-              onClose={() => selectItem(null)}
-              onCancel={cancelDraft}
-              onSave={saveNew}
-              onAdjust={adjustQuantity}
-              onDelete={removeItem}
-            />
-          )}
-        </div>
-      </aside>
-    </div>
+      <DetailPanel label="Item details" open={!!spotlightItem}>
+        {spotlightItem && (
+          <ItemDetails
+            key={`${spotlightItem.id}-${editing}-${formVersion}`}
+            item={spotlightItem}
+            isDraft={spotlightItem.id === DRAFT_ID}
+            editing={editing}
+            canModify={canModifyItem}
+            canDelete={canDeleteItem}
+            saving={saving}
+            adjusting={adjustingIds.includes(spotlightItem.id)}
+            error={error}
+            onDismissError={() => setError('')}
+            onDirtyChange={setDirty}
+            onEdit={() => { setError(''); setEditing(true); }}
+            onClose={() => selectItem(null)}
+            onCancel={cancelForm}
+            onSave={editing ? saveEdit : saveNew}
+            onAdjust={adjustQuantity}
+            onDelete={removeItem}
+            tags={<TagEditor allTags={tags} selectedIds={tagIdsOf(spotlightItem)} canEdit={canEditTags && tagsLoaded} canCreateTags={canCreateTags} onChange={(ids) => void updateItemTags(spotlightItem.id, ids)} onCreate={createTagByName} />}
+            draftTags={(ids, onChange) => <TagEditor allTags={tags} selectedIds={ids} canEdit={canEditTags && tagsLoaded} canCreateTags={canCreateTags} onChange={onChange} onCreate={createTagByName} />}
+          />
+        )}
+      </DetailPanel>
+    </Workspace>
   );
 };

@@ -1,6 +1,135 @@
+@config "../tailwind.config.js";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --neutral-50: 250 250 250;
+    --neutral-100: 245 245 245;
+    --neutral-200: 225 225 225;
+    --neutral-300: 200 200 200;
+    --neutral-400: 171 171 171;
+    --neutral-500: 148 148 148;
+    --neutral-600: 115 115 115;
+    --neutral-700: 75 75 75;
+    --neutral-800: 54 54 54;
+    --neutral-900: 38 38 38;
+    --neutral-950: 28 28 28;
+    --accent: 255 255 255;
+    --success-text: 110 231 183;
+    --warning-text: 252 211 77;
+    --danger-text: 253 164 175;
+    color-scheme: dark;
+    @apply bg-slate-950 font-sans text-slate-100;
+  }
+
+  :root[data-theme='light'] {
+    --neutral-50: 10 10 10;
+    --neutral-100: 24 24 24;
+    --neutral-200: 42 42 42;
+    --neutral-300: 64 64 64;
+    --neutral-400: 90 90 90;
+    --neutral-500: 105 105 105;
+    --neutral-600: 115 115 115;
+    --neutral-700: 204 204 204;
+    --neutral-800: 229 229 229;
+    --neutral-900: 255 255 255;
+    --neutral-950: 246 246 246;
+    --accent: 24 24 24;
+    --success-text: 4 120 87;
+    --warning-text: 146 64 14;
+    --danger-text: 190 18 60;
+    color-scheme: light;
+  }
+
+  ::selection {
+    @apply bg-white text-slate-950;
+  }
+
+  :where(button, a, input, select, textarea):focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-white;
+  }
+
+  button:disabled {
+    @apply cursor-not-allowed;
+  }
+}
+
+@layer components {
+  .ui-input {
+    @apply w-full min-w-0 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 transition-colors focus:border-white focus:outline-none focus:ring-2 focus:ring-white/20 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .ui-button {
+    @apply inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .ui-button-primary {
+    @apply ui-button bg-white text-slate-950 enabled:hover:bg-slate-200;
+  }
+
+  .ui-button-secondary {
+    @apply ui-button border border-slate-700 bg-slate-900 text-slate-200 enabled:hover:bg-slate-800;
+  }
+
+  .ui-button-ghost {
+    @apply ui-button text-slate-400 enabled:hover:bg-slate-800 enabled:hover:text-slate-100;
+  }
+
+  .ui-icon-button {
+    @apply inline-flex shrink-0 items-center justify-center rounded-lg p-2 text-slate-400 transition-colors enabled:hover:bg-slate-800 enabled:hover:text-slate-100 disabled:opacity-40;
+  }
+
+  .ui-card {
+    @apply rounded-xl border border-slate-800 bg-slate-900/50 p-5;
+  }
+
+  .ui-toolbar {
+    @apply flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-800 bg-slate-900/30 px-4 py-3 sm:px-6;
+  }
+
+  .ui-badge {
+    @apply inline-flex max-w-full shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  .ui-badge-success {
+    @apply ui-badge bg-emerald-500/15 text-emerald-300;
+  }
+
+  .ui-badge-warning {
+    @apply ui-badge bg-amber-500/15 text-amber-300;
+  }
+
+  .ui-badge-danger {
+    @apply ui-badge bg-rose-500/15 text-rose-300;
+  }
+
+  .ui-badge-accent {
+    @apply ui-badge bg-slate-800 text-slate-300;
+  }
+
+  .ui-list-row {
+    @apply flex w-full items-center gap-3 border-l-2 px-4 py-3.5 text-left transition-colors sm:gap-4 sm:px-6;
+  }
+
+  .ui-list-row-active {
+    @apply border-white bg-white/5;
+  }
+
+  .ui-list-row-idle {
+    @apply border-transparent hover:bg-slate-900/60;
+  }
+
+  .ui-empty-state {
+    @apply flex min-h-48 h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-slate-400;
+  }
+
+  .booking-hour:focus-visible {
+    @apply relative z-[2] -outline-offset-2;
+  }
+}
 
 html,
 body,
@@ -9,4 +138,24 @@ body,
   min-height: 100vh;
   margin: 0;
   padding: 0;
+}
+
+:root.theme-transitioning,
+:root.theme-transitioning *,
+:root.theme-transitioning *::before,
+:root.theme-transitioning *::after {
+  transition-property: background-color, color, border-color, outline-color, fill, stroke;
+  transition-duration: 200ms;
+  transition-timing-function: ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

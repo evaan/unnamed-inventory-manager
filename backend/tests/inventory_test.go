@@ -18,7 +18,7 @@ import (
 func TestAddItem(t *testing.T) {
 
 	router, db := newAuthRouter(t)
-	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
+	_, token := newTestSession(t, db, auth.PermissionCreateItem)
 
 	body := `{
 		"itemName": "TestItem1",
@@ -28,7 +28,7 @@ func TestAddItem(t *testing.T) {
 		"description": "This is a test item"
 	}`
 
-	response := makeRequest(router, http.MethodPost, "/items", body, adminToken)
+	response := makeRequest(router, http.MethodPost, "/items", body, token)
 
 	// Ensure HTTP response is correct
 	requireStatus(t, response, http.StatusCreated)
@@ -175,7 +175,7 @@ func TestGetNonExistentItem(t *testing.T) {
 func TestEditItem(t *testing.T) {
 
 	router, db := newAuthRouter(t)
-	_, token := newTestSession(t, db, "View", "Edit")
+	_, token := newTestSession(t, db, auth.PermissionModifyItem)
 
 	testItemToEdit := inventory.Item{
 		ID:               uuid.New(),
@@ -230,7 +230,7 @@ func TestEditItem(t *testing.T) {
 
 func TestRemoveItem(t *testing.T) {
 	router, db := newAuthRouter(t)
-	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
+	_, token := newTestSession(t, db, auth.PermissionDeleteItem)
 
 	testItemToRemove := inventory.Item{
 		ID:               uuid.New(),
@@ -244,7 +244,7 @@ func TestRemoveItem(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	response := makeRequest(router, http.MethodDelete, "/items/"+testItemToRemove.ID.String(), "", adminToken)
+	response := makeRequest(router, http.MethodDelete, "/items/"+testItemToRemove.ID.String(), "", token)
 
 	// Ensure HTTP response is correct
 	requireStatus(t, response, http.StatusNoContent)
@@ -417,7 +417,7 @@ func TestAddItemWithCategory(t *testing.T) {
 func TestAttachCategoryByUpdatingItem(t *testing.T) {
 
 	router, db := newAuthRouter(t)
-	_, token := newTestSession(t, db, "View", "Edit")
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
 
 	testItemToEdit := inventory.Item{
 		ID:               uuid.New(),
@@ -456,7 +456,7 @@ func TestAttachCategoryByUpdatingItem(t *testing.T) {
 		]
 	}`
 
-	response := makeRequest(router, http.MethodPut, "/items/"+testItemToEdit.ID.String(), body, token)
+	response := makeRequest(router, http.MethodPut, "/items/"+testItemToEdit.ID.String(), body, adminToken)
 
 	// Ensure HTTP response is correct
 	requireStatus(t, response, http.StatusOK)
@@ -506,7 +506,7 @@ func TestAttachCategoryByUpdatingItem(t *testing.T) {
 func TestAttachInvalidCategory(t *testing.T) {
 
 	router, db := newAuthRouter(t)
-	_, token := newTestSession(t, db, "View", "Edit")
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
 
 	testItemToEdit := inventory.Item{
 		ID:               uuid.New(),
@@ -546,7 +546,7 @@ func TestAttachInvalidCategory(t *testing.T) {
 		]
 	}`
 
-	response := makeRequest(router, http.MethodPut, "/items/"+testItemToEdit.ID.String(), body, token)
+	response := makeRequest(router, http.MethodPut, "/items/"+testItemToEdit.ID.String(), body, adminToken)
 
 	// Ensure HTTP response is correct
 	requireStatus(t, response, http.StatusBadRequest)
@@ -567,7 +567,7 @@ func TestAttachInvalidCategory(t *testing.T) {
 func TestNoNewFieldsItem(t *testing.T) {
 
 	router, db := newAuthRouter(t)
-	_, token := newTestSession(t, db, "View", "Edit")
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
 
 	testCategory1 := inventory.ItemCategory{
 		ID:           uuid.New(),
@@ -604,7 +604,7 @@ func TestNoNewFieldsItem(t *testing.T) {
 	body := `{
 	}`
 
-	response := makeRequest(router, http.MethodPut, "/items/"+testItemToEdit.ID.String(), body, token)
+	response := makeRequest(router, http.MethodPut, "/items/"+testItemToEdit.ID.String(), body, adminToken)
 
 	// Ensure HTTP response is correct
 	requireStatus(t, response, http.StatusBadRequest)
@@ -740,4 +740,52 @@ func TestGetCategoryByID(t *testing.T) {
 	if retrievedCategory.CategoryName != "testCategory1" {
 		t.Errorf("Expected Name: testCategory1 | Actual Value: %q", retrievedCategory.CategoryName)
 	}
+}
+
+func TestInventoryRequiresPermissions(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db)
+	path := "/items/" + uuid.New().String()
+
+	response := makeRequest(router, http.MethodPost, "/items",
+		`{"itemName":"Test item","quantity":1,"manufacturer":"TestCompany","manufacturerPart":"A1"}`, token)
+	requireStatus(t, response, http.StatusForbidden)
+
+	response = makeRequest(router, http.MethodPut, path, `{"quantity":2}`, token)
+	requireStatus(t, response, http.StatusForbidden)
+
+	response = makeRequest(router, http.MethodDelete, path, "", token)
+	requireStatus(t, response, http.StatusForbidden)
+}
+
+func TestAdministratorCanModifyItem(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, token := newTestSession(t, db, auth.PermissionAdministrator)
+	item := inventory.Item{
+		ID: uuid.New(), ItemName: "Test item", Quantity: 1,
+		Manufacturer: "TestCompany", ManufacturerPart: "A1",
+	}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	response := makeRequest(router, http.MethodPut, "/items/"+item.ID.String(), `{"quantity":2}`, token)
+	requireStatus(t, response, http.StatusOK)
+	if err := db.First(&item, "id = ?", item.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if item.Quantity != 2 {
+		t.Errorf("Expected quantity 2, got %d", item.Quantity)
+	}
+}
+
+func TestDisabledUserCannotModifyItem(t *testing.T) {
+	router, db := newAuthRouter(t)
+	user, token := newTestSession(t, db, auth.PermissionModifyItem)
+	if err := db.Model(&user).Update("disabled", true).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	response := makeRequest(router, http.MethodPut, "/items/"+uuid.New().String(), `{"quantity":2}`, token)
+	requireStatus(t, response, http.StatusForbidden)
 }

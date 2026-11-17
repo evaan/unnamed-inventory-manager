@@ -125,6 +125,19 @@ func TestClearPermissions(t *testing.T) {
 	assertJSON(t, response, []string{})
 }
 
+func TestBookingPermissionsRoundTrip(t *testing.T) {
+	router, db := newAuthRouter(t)
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
+	user, token := newTestSession(t, db)
+
+	response := makeRequest(router, http.MethodPut, "/permissions/"+user.ID.String(), `{"permissions":["BookingAdd","BookingModify","BookingDelete","BookingManage"]}`, adminToken)
+	requireStatus(t, response, http.StatusNoContent)
+
+	response = makeRequest(router, http.MethodGet, "/permissions", "", token)
+	requireStatus(t, response, http.StatusOK)
+	assertJSON(t, response, []string{auth.PermissionBookingAdd, auth.PermissionBookingDelete, auth.PermissionBookingManage, auth.PermissionBookingModify})
+}
+
 func TestRegularUserCannotSetPermissions(t *testing.T) {
 	router, db := newAuthRouter(t)
 	user, token := newTestSession(t, db, "View")
@@ -139,11 +152,12 @@ func TestRegularUserCannotSetPermissions(t *testing.T) {
 
 func TestRemovingAdminBlocksAdminActions(t *testing.T) {
 	router, db := newAuthRouter(t)
+	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)
 	admin, token := newTestSession(t, db, auth.PermissionAdministrator)
 	user, userToken := newTestSession(t, db)
 	path := "/permissions/" + admin.ID.String()
 
-	response := makeRequest(router, http.MethodPut, path, `{"permissions":["View"]}`, token)
+	response := makeRequest(router, http.MethodPut, path, `{"permissions":["View"]}`, adminToken)
 	requireStatus(t, response, http.StatusNoContent)
 
 	response = makeRequest(router, http.MethodGet, "/permissions", "", token)
@@ -168,6 +182,50 @@ func TestRemovingAdminBlocksAdminActions(t *testing.T) {
 		"email":       user.Email,
 		"permissions": []string{},
 	})
+}
+
+func TestAdminCannotRemoveOwnAdministrator(t *testing.T) {
+	for _, test := range []struct {
+		body   string
+		status int
+	}{
+		{`{"permissions":[]}`, http.StatusForbidden},
+		{`{"permissions":["View"]}`, http.StatusForbidden},
+		{`{"permissions":null}`, http.StatusBadRequest},
+		{`{}`, http.StatusBadRequest},
+	} {
+		t.Run(test.body, func(t *testing.T) {
+			router, db := newAuthRouter(t)
+			admin, token := newTestSession(t, db, auth.PermissionAdministrator, "View")
+
+			response := makeRequest(router, http.MethodPut, "/permissions/"+admin.ID.String(), test.body, token)
+			requireStatus(t, response, test.status)
+
+			response = makeRequest(router, http.MethodGet, "/permissions", "", token)
+			requireStatus(t, response, http.StatusOK)
+			assertJSON(t, response, []string{auth.PermissionAdministrator, "View"})
+		})
+	}
+}
+
+func TestAdminCanUpdateOwnOtherPermissions(t *testing.T) {
+	router, db := newAuthRouter(t)
+	admin, token := newTestSession(t, db, auth.PermissionAdministrator, "View")
+	path := "/permissions/" + admin.ID.String()
+
+	response := makeRequest(router, http.MethodPut, path, `{"permissions":["Administrator","BookingManage"]}`, token)
+	requireStatus(t, response, http.StatusNoContent)
+
+	response = makeRequest(router, http.MethodGet, "/permissions", "", token)
+	requireStatus(t, response, http.StatusOK)
+	assertJSON(t, response, []string{auth.PermissionAdministrator, auth.PermissionBookingManage})
+
+	response = makeRequest(router, http.MethodPut, path, `{"permissions":["Administrator"]}`, token)
+	requireStatus(t, response, http.StatusNoContent)
+
+	response = makeRequest(router, http.MethodGet, "/permissions", "", token)
+	requireStatus(t, response, http.StatusOK)
+	assertJSON(t, response, []string{auth.PermissionAdministrator})
 }
 
 func TestGetUsers(t *testing.T) {

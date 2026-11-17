@@ -140,6 +140,10 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 			settings.GetSettings(c, db)
 		})
 
+		admin.POST("/settings", func(c *gin.Context) {
+			settings.CreateSetting(c, db)
+		})
+
 		admin.PATCH("/settings", func(c *gin.Context) {
 			settings.PatchSettings(c, db)
 		})
