@@ -16,8 +16,21 @@ definitions:
     required:
     - permissions
     type: object
+  inventory.CreateItemCategoryReq:
+    properties:
+      categoryName:
+        type: string
+      parentID:
+        type: string
+    required:
+    - categoryName
+    type: object
   inventory.CreateItemReq:
     properties:
+      categories:
+        items:
+          type: string
+        type: array
       dataSheetURL:
         type: string
       description:
@@ -44,6 +57,10 @@ definitions:
     type: object
   inventory.UpdateItemReq:
     properties:
+      categories:
+        items:
+          type: string
+        type: array
       dataSheetURL:
         type: string
       distributorPart:
@@ -120,6 +137,64 @@ paths:
       summary: Finish logging in with Google
       tags:
       - Auth
+  /categories:
+    get:
+      consumes:
+      - application/json
+      description: Gets information for all categories
+      responses:
+        "200":
+          description: Category information retrieved
+        "500":
+          description: Error retrieving categories
+      summary: Get all Categories
+      tags:
+      - Category
+    post:
+      consumes:
+      - application/json
+      description: Adds a category for items to the inventory manager
+      parameters:
+      - description: Category information (categoryName, parentID)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/inventory.CreateItemCategoryReq'
+      responses:
+        "201":
+          description: Item category created
+        "400":
+          description: Invalid request body
+        "500":
+          description: Error creating category
+      summary: Add item category
+      tags:
+      - Category
+  /categories/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Gets information for one category
+      parameters:
+      - description: Item Category ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Category retrieved
+        "400":
+          description: Invalid category ID
+        "404":
+          description: Category not found
+        "500":
+          description: Error retrieving item category
+      summary: Get category
+      tags:
+      - Category
   /items:
     get:
       consumes:

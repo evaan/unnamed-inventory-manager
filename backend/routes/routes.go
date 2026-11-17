@@ -63,8 +63,20 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 			inventory.GetItems(c, db)
 		})
 
+		public.GET("/categories", func(c *gin.Context) {
+			inventory.GetCategories(c, db)
+		})
+
 		public.GET("items/:id", func(c *gin.Context) {
 			inventory.GetItemByID(c, db)
+		})
+
+		public.GET("categories/:id", func(c *gin.Context) {
+			inventory.GetCategoryByID(c, db)
+		})
+
+		public.POST("/categories", func(c *gin.Context) {
+			inventory.CreateCategory(c, db)
 		})
 
 		public.POST("/items", func(c *gin.Context) {

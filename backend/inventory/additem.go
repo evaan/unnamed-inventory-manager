@@ -56,6 +56,35 @@ func AddItem(c *gin.Context, db *gorm.DB) {
 		DataSheetURL:     req.DataSheetURL,
 		Description:      req.Description}
 
+	if req.Categories != nil {
+
+		var categories []ItemCategory
+
+		if err := db.Where("id IN ?", *req.Categories).Find(&categories).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Error retrieving categories for items",
+			})
+			return
+		}
+
+		databaseIDS := make(map[uuid.UUID]bool)
+
+		for _, category := range categories {
+			databaseIDS[category.ID] = true
+		}
+
+		for _, reqID := range *req.Categories {
+			if !databaseIDS[reqID] {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": "Adding category that wasn't found in the database",
+				})
+				return
+			}
+		}
+
+		newItem.Categories = categories
+	}
+
 	if err := db.Create(&newItem).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to create item",

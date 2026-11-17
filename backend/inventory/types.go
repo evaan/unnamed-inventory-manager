@@ -8,12 +8,13 @@ import (
 )
 
 type Item struct {
-	ID               uuid.UUID `gorm:"type:uuid;primaryKey"`
-	ItemName         string    `gorm:"not null"`
-	Quantity         int32     `gorm:"type:integer;not null"`
-	Manufacturer     string    `gorm:"not null"`
-	ManufacturerPart string    `gorm:"not null"`
-	DistributorPart  string    // Digikey or McMaster part number
+	ID               uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	ItemName         string         `gorm:"not null"`
+	Quantity         int32          `gorm:"type:integer;not null"`
+	Manufacturer     string         `gorm:"not null"`
+	ManufacturerPart string         `gorm:"not null"`
+	Categories       []ItemCategory `gorm:"many2many:ItemCategoryLinks;"`
+	DistributorPart  string         // Digikey or McMaster part number
 	DistributorURL   string
 	DataSheetURL     string
 	Description      string
@@ -42,27 +43,29 @@ const (
 )
 
 type UpdateItemReq struct {
-	ItemName         *string `json:"itemName"`
-	Quantity         *int32  `json:"quantity"`
-	Manufacturer     *string `json:"manufacturer"`
-	ManufacturerPart *string `json:"manufacturerPart"`
-	DistributorPart  *string `json:"distributorPart"`
-	DistributorURL   *string `json:"distributorURL"`
-	ItemDescription  *string `json:"itemDescription"`
-	DataSheetURL     *string `json:"dataSheetURL"`
-	LogDescription   *string `json:"logDescription"`
+	ItemName         *string      `json:"itemName"`
+	Quantity         *int32       `json:"quantity"`
+	Manufacturer     *string      `json:"manufacturer"`
+	ManufacturerPart *string      `json:"manufacturerPart"`
+	Categories       *[]uuid.UUID `json:"categories"`
+	DistributorPart  *string      `json:"distributorPart"`
+	DistributorURL   *string      `json:"distributorURL"`
+	ItemDescription  *string      `json:"itemDescription"`
+	DataSheetURL     *string      `json:"dataSheetURL"`
+	LogDescription   *string      `json:"logDescription"`
 }
 
 type CreateItemReq struct {
-	ItemName         string `json:"itemName" binding:"required"`
-	Quantity         *int32 `json:"quantity" binding:"required"`
-	Manufacturer     string `json:"manufacturer" binding:"required"`
-	ManufacturerPart string `json:"manufacturerPart" binding:"required"`
-	DistributorPart  string `json:"distributorPart"`
-	DistributorURL   string `json:"distributorURL"`
-	DataSheetURL     string `json:"dataSheetURL"`
-	Description      string `json:"description"`
-	LogDescription   string `json:"logDescription"`
+	ItemName         string       `json:"itemName" binding:"required"`
+	Quantity         *int32       `json:"quantity" binding:"required"`
+	Manufacturer     string       `json:"manufacturer" binding:"required"`
+	ManufacturerPart string       `json:"manufacturerPart" binding:"required"`
+	Categories       *[]uuid.UUID `json:"categories"`
+	DistributorPart  string       `json:"distributorPart"`
+	DistributorURL   string       `json:"distributorURL"`
+	DataSheetURL     string       `json:"dataSheetURL"`
+	Description      string       `json:"description"`
+	LogDescription   string       `json:"logDescription"`
 }
 
 type ItemDTO struct {
@@ -72,8 +75,13 @@ type ItemDTO struct {
 }
 
 type ItemCategory struct {
-	ID           uuid.UUID `gorm:"type:uuid;not null"`
-	CategoryName string    `gorm:"not null"`
-	ParentID     uuid.UUID
-	Parent       *ItemCategory `gorm:"foreignKey:ParentID;references:CategoryName"`
+	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
+	CategoryName   string    `gorm:"not null"`
+	ParentID       *uuid.UUID
+	ParentCategory *ItemCategory `gorm:"foreignKey:ParentID;references:ID"`
+}
+
+type CreateItemCategoryReq struct {
+	CategoryName string     `json:"categoryName" binding:"required"`
+	ParentID     *uuid.UUID `json:"parentID"`
 }

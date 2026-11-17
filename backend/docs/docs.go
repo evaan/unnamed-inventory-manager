@@ -67,6 +67,94 @@ const docTemplate = `{
                 }
             }
         },
+        "/categories": {
+            "get": {
+                "description": "Gets information for all categories",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Category"
+                ],
+                "summary": "Get all Categories",
+                "responses": {
+                    "200": {
+                        "description": "Category information retrieved"
+                    },
+                    "500": {
+                        "description": "Error retrieving categories"
+                    }
+                }
+            },
+            "post": {
+                "description": "Adds a category for items to the inventory manager",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Category"
+                ],
+                "summary": "Add item category",
+                "parameters": [
+                    {
+                        "description": "Category information (categoryName, parentID)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/inventory.CreateItemCategoryReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Item category created"
+                    },
+                    "400": {
+                        "description": "Invalid request body"
+                    },
+                    "500": {
+                        "description": "Error creating category"
+                    }
+                }
+            }
+        },
+        "/categories/{id}": {
+            "get": {
+                "description": "Gets information for one category",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Category"
+                ],
+                "summary": "Get category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Item Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Category retrieved"
+                    },
+                    "400": {
+                        "description": "Invalid category ID"
+                    },
+                    "404": {
+                        "description": "Category not found"
+                    },
+                    "500": {
+                        "description": "Error retrieving item category"
+                    }
+                }
+            }
+        },
         "/items": {
             "get": {
                 "description": "Gets information for all items",
@@ -829,6 +917,20 @@ const docTemplate = `{
                 }
             }
         },
+        "inventory.CreateItemCategoryReq": {
+            "type": "object",
+            "required": [
+                "categoryName"
+            ],
+            "properties": {
+                "categoryName": {
+                    "type": "string"
+                },
+                "parentID": {
+                    "type": "string"
+                }
+            }
+        },
         "inventory.CreateItemReq": {
             "type": "object",
             "required": [
@@ -838,6 +940,12 @@ const docTemplate = `{
                 "quantity"
             ],
             "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "dataSheetURL": {
                     "type": "string"
                 },
@@ -870,6 +978,12 @@ const docTemplate = `{
         "inventory.UpdateItemReq": {
             "type": "object",
             "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "dataSheetURL": {
                     "type": "string"
                 },
