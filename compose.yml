@@ -73,7 +73,7 @@ services:
       traefik.http.services.backend.loadbalancer.server.port: "8080"
 
   postgres:
-    image: postgres:alpine
+    image: postgres:19-alpine
     restart: always
     environment:
       POSTGRES_USER: admin
