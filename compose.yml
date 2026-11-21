@@ -12,7 +12,7 @@ services:
       - --providers.docker.constraints=Label(`com.docker.compose.project`, `inventory`)
       - --entrypoints.web.address=:80
     ports:
-      - "8980:80"
+      - "8381:80"
     depends_on:
       - docker-socket-proxy
     networks:
