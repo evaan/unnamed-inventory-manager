@@ -1,0 +1,6 @@
+Captured: 2026-11-21T18:48:27-03:30  commit: 1b19cfd
+GET https://inventory.evaan.dev/
+HTTP 200
+GET https://inventory.evaan.dev/api/whoami
+{"loggedIn":false}
+HTTP 200
