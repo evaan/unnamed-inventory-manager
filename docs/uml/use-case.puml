@@ -1,0 +1,193 @@
+@startuml use-case
+' Use case diagram for the whole system (React frontend + Go backend).
+'
+' Actors that hold permissions are specialisations of "User". A real account can
+' hold any combination of permissions. Administrator overrides every permission
+' check, so it inherits every role.
+' Use cases marked (API only) exist in the backend but have no screen in the UI.
+' Use cases marked (demo) work in the UI but have no backend yet: data is held in
+' browser memory and resets on reload.
+
+title Unnamed Inventory Manager: Use Case Diagram
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor<<demo>> #FFF4D6
+  BorderColor<<demo>> #B8860B
+  BackgroundColor<<api>> #E8EEF7
+  BorderColor<<api>> #4A6FA5
+}
+
+' ---------------------------------------------------------------- actors
+actor "Visitor\n(not logged in)" as Visitor
+actor "Disabled User" as Disabled
+actor "User\n(enabled account)" as User
+actor "Item Editor\n(CreateItem / ModifyItem /\nDeleteItem)" as ItemEditor
+actor "Category Manager\n(CreateTag / DeleteTag)" as CategoryManager
+actor "Equipment Manager\n(BookingAdd / BookingModify /\nBookingDelete)" as EquipmentManager
+actor "Booking Manager\n(BookingManage)" as BookingManager
+actor "Administrator" as Admin
+actor "Google OAuth" as Google <<external system>>
+
+ItemEditor -|> User
+CategoryManager -|> User
+EquipmentManager -|> User
+BookingManager -|> User
+Admin -|> ItemEditor
+Admin -|> CategoryManager
+Admin -|> EquipmentManager
+Admin -|> BookingManager
+
+rectangle "Unnamed Inventory Manager" {
+
+  ' ------------------------------------------------ account
+  package "Account & Session" {
+    usecase "Log in with Google" as UC_Login
+    usecase "Authenticate with\nGoogle OAuth" as UC_OAuth
+    usecase "Create account\n(per signup policy)" as UC_Signup
+    usecase "Log out" as UC_Logout
+    usecase "View disabled-account notice" as UC_DisabledNotice
+    usecase "View account details" as UC_Account
+    usecase "Toggle light / dark theme" as UC_Theme
+  }
+
+  ' ------------------------------------------------ inventory
+  package "Inventory" {
+    usecase "Browse items" as UC_Browse
+    usecase "Search items" as UC_Search
+    usecase "Filter items by category" as UC_Filter
+    usecase "View item details\nand stock level" as UC_ViewItem
+    usecase "View item changelog" as UC_Logs <<api>>
+    usecase "Create item" as UC_CreateItem
+    usecase "Edit item details" as UC_EditItem
+    usecase "Assign categories to item" as UC_AssignCat
+    usecase "Adjust stock\n(add / take)" as UC_Adjust
+    usecase "Delete item" as UC_DeleteItem
+    usecase "Record changelog entry" as UC_RecordLog
+    usecase "Confirm discarding\nunsaved changes" as UC_Unsaved
+  }
+
+  ' ------------------------------------------------ categories
+  package "Categories" {
+    usecase "Create category" as UC_CreateCat
+    usecase "Move category\n(change parent)" as UC_MoveCat
+    usecase "Delete category" as UC_DeleteCat
+  }
+
+  ' ------------------------------------------------ bookings
+  package "Equipment Bookings (demo)" {
+    usecase "View equipment schedule" as UC_Schedule <<demo>>
+    usecase "Filter equipment\n(category / available now)" as UC_FilterEq <<demo>>
+    usecase "Book equipment" as UC_Book <<demo>>
+    usecase "Validate booking slot\n(hours, overlap, max 8 h,\nmaintenance)" as UC_Validate <<demo>>
+    usecase "View my bookings" as UC_MyBookings <<demo>>
+    usecase "View reservation details" as UC_ResDetails <<demo>>
+    usecase "Modify own reservation" as UC_ModifyOwn <<demo>>
+    usecase "Cancel own reservation" as UC_CancelOwn <<demo>>
+    usecase "View all bookings" as UC_AllBookings <<demo>>
+    usecase "Modify / cancel another\nuser's reservation" as UC_ManageOthers <<demo>>
+    usecase "Add equipment" as UC_AddEq <<demo>>
+    usecase "Edit equipment\n(details, hours, maintenance)" as UC_EditEq <<demo>>
+    usecase "Remove equipment\n(and its reservations)" as UC_RemoveEq <<demo>>
+  }
+
+  ' ------------------------------------------------ administration
+  package "Administration" {
+    usecase "View users" as UC_Users
+    usecase "Search users" as UC_SearchUsers
+    usecase "Edit user permissions" as UC_Perms
+    usecase "Enable / disable user" as UC_Disable
+    usecase "View application settings" as UC_Settings
+    usecase "Set signup policy\n(open / whitelist / closed)" as UC_Policy
+    usecase "Edit whitelisted\nemail domains" as UC_Domains
+    usecase "Create setting" as UC_CreateSetting <<api>>
+  }
+}
+
+' ================================================================ actor links
+
+Visitor --> UC_Login
+UC_Login .> UC_OAuth : <<include>>
+UC_OAuth -- Google
+UC_Signup .> UC_Login : <<extend>>\n[first login]
+
+Disabled --> UC_DisabledNotice
+Disabled --> UC_Logout
+Disabled --> UC_Theme
+
+User --> UC_Logout
+User --> UC_Account
+User --> UC_Theme
+User --> UC_Browse
+User --> UC_ViewItem
+User --> UC_Logs
+User --> UC_Schedule
+User --> UC_Book
+User --> UC_MyBookings
+User --> UC_ResDetails
+User --> UC_ModifyOwn
+User --> UC_CancelOwn
+
+ItemEditor --> UC_CreateItem
+ItemEditor --> UC_EditItem
+ItemEditor --> UC_Adjust
+ItemEditor --> UC_DeleteItem
+
+CategoryManager --> UC_CreateCat
+CategoryManager --> UC_MoveCat
+CategoryManager --> UC_DeleteCat
+
+EquipmentManager --> UC_AddEq
+EquipmentManager --> UC_EditEq
+EquipmentManager --> UC_RemoveEq
+
+BookingManager --> UC_AllBookings
+BookingManager --> UC_ManageOthers
+
+Admin --> UC_Users
+Admin --> UC_Perms
+Admin --> UC_Disable
+Admin --> UC_Settings
+Admin --> UC_Policy
+Admin --> UC_Domains
+Admin --> UC_CreateSetting
+
+' ================================================================ include / extend
+
+UC_Search .> UC_Browse : <<extend>>
+UC_Filter .> UC_Browse : <<extend>>
+UC_AssignCat .> UC_EditItem : <<extend>>
+UC_AssignCat .> UC_CreateItem : <<extend>>
+UC_CreateCat .> UC_AssignCat : <<extend>>\n[new tag name]
+UC_Unsaved .> UC_EditItem : <<extend>>\n[navigate away while dirty]
+
+UC_CreateItem .> UC_RecordLog : <<include>>
+UC_EditItem .> UC_RecordLog : <<include>>
+UC_Adjust .> UC_RecordLog : <<include>>
+UC_DeleteItem .> UC_RecordLog : <<include>>
+
+UC_FilterEq .> UC_Schedule : <<extend>>
+UC_Book .> UC_Validate : <<include>>
+UC_ModifyOwn .> UC_Validate : <<include>>
+UC_ManageOthers .> UC_Validate : <<include>>
+
+UC_SearchUsers .> UC_Users : <<extend>>
+UC_Domains .> UC_Policy : <<extend>>\n[policy = whitelist]
+
+note bottom of UC_Signup
+  New accounts are created disabled unless
+  signup_policy = open, or = whitelist and the
+  email domain is whitelisted. The ADMIN_EMAIL
+  account is always enabled and given
+  Administrator if no admin exists yet.
+end note
+
+legend right
+  |= Colour |= Meaning |
+  |<#FFF4D6> | (demo) UI only, in-memory data, no backend yet |
+  |<#E8EEF7> | (API only) backend endpoint, no UI screen |
+  | white | implemented in UI and backend |
+endlegend
+
+@enduml

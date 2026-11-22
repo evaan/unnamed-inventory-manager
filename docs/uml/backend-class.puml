@@ -1,0 +1,321 @@
+@startuml backend-class
+' Backend class diagram (Go, Gin, GORM, PostgreSQL)
+'
+' Go has no classes. In this diagram:
+'   <<entity>>   GORM model struct, persisted in PostgreSQL
+'   <<dto>>      request body struct bound from JSON
+'   <<enum>>     string constants
+'   <<module>>   a Go package's exported functions (HTTP handlers or helpers)
+' Handler functions take (c *gin.Context, db *gorm.DB) unless shown otherwise.
+
+title Unnamed Inventory Manager: Backend Class Diagram
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+hide empty members
+
+' ---------------------------------------------------------------- main
+package "main" {
+  class Main <<module>> {
+    + main()
+    ..
+    loads .env, builds oauth2.Config,
+    connects DB, migrates, starts Gin on :8080
+  }
+}
+
+' ---------------------------------------------------------------- routes
+package "routes" {
+  class Routes <<module>> {
+    + Register(router: *gin.Engine, db: *gorm.DB, oauthCfg: *oauth2.Config, frontendURL: string): error
+    ..
+    public group  (AuthOptional): /login /callback /whoami
+    private group (AuthRequired): /permissions /items /categories /logs
+    session group (SessionRequired): /logout
+    admin group   (AuthRequired + AdminRequired):
+        /permissions/:id /user/:id /users /settings
+  }
+}
+
+' ---------------------------------------------------------------- middleware
+package "middleware" {
+  class AuthMiddleware <<module>> {
+    + AuthOptional(db): gin.HandlerFunc
+    + AuthRequired(db): gin.HandlerFunc
+    + SessionRequired(db): gin.HandlerFunc
+    + AdminRequired(db): gin.HandlerFunc
+    + PermissionRequired(db, permission: string): gin.HandlerFunc
+    + CSRF(allowedOrigins: ...string): gin.HandlerFunc
+    - requireSession(db, allowDisabled: bool): gin.HandlerFunc
+  }
+  class CORSMiddleware <<module>> {
+    + CORS(frontendURL: string): gin.HandlerFunc
+  }
+}
+
+' ---------------------------------------------------------------- database
+package "database" {
+  class Database <<module>> {
+    + Connect(): (*gorm.DB, error)
+    + Migrate(db: *gorm.DB): error
+  }
+}
+
+' ---------------------------------------------------------------- auth
+package "auth" {
+  class User <<entity>> {
+    + ID: uuid.UUID {PK}
+    + Name: string
+    + Email: string {unique}
+    + ProfilePictureURL: string
+    - GoogleID: string {unique, hidden from JSON}
+    + Disabled: bool = false
+  }
+
+  class UserSession <<entity>> {
+    + ID: int {PK}
+    + UserID: uuid.UUID {FK}
+    - SessionToken: string {unique, SHA-256 hash}
+    + Expires: time.Time
+  }
+
+  class UserPermission <<entity>> {
+    + ID: int {PK}
+    + UserID: uuid.UUID {FK}
+    + Permission: string
+    ..
+    unique(UserID, Permission)
+  }
+
+  enum Permission <<enum>> {
+    Administrator
+    CreateItem
+    DeleteItem
+    ModifyItem
+    CreateTag
+    DeleteTag
+    BookingAdd
+    BookingModify
+    BookingDelete
+    BookingManage
+  }
+
+  class PutPermissionsRequest <<dto>> {
+    + Permissions: []string {required}
+  }
+
+  class PatchUserRequest <<dto>> {
+    + Disabled: *bool {required}
+  }
+
+  class AuthHandlers <<module>> {
+    + Login(c, oauthCfg)
+    + Callback(c, oauthCfg, db, frontendURL)
+    + WhoAmI(c, db)
+    + Logout(c, db)
+    + GetPermissions(c, db)
+    + GetPermissionsFromId(c, db)
+    + PutPermissions(c, db)
+    + GetUsers(c, db)
+    + GetUserByID(c, db)
+    + PatchUser(c, db)
+  }
+
+  class AuthService <<module>> {
+    + CreateLoginSession(db, googleID, name, email: string): (string, error)
+    + GetUser(c): (*User, error)
+    + IsAdmin(db, user: *User): (bool, error)
+    + HasPermission(db, user: *User, permission: string): (bool, error)
+    + DoesUserExist(db, userID: string): (bool, error)
+    + GetUserPermissions(db, userID: uuid.UUID): ([]string, error)
+    + SetCookie(c, name, value: string, maxAge: int)
+    + GenerateToken(): string
+    + HashToken(token: string): string
+    - newUserDisabled(db, email: string): (bool, error)
+  }
+}
+
+' ---------------------------------------------------------------- inventory
+package "inventory" {
+  class Item <<entity>> {
+    + ID: uuid.UUID {PK}
+    + ItemName: string
+    + Quantity: int32
+    + Manufacturer: string
+    + ManufacturerPart: string
+    + Categories: []ItemCategory
+    + DistributorPart: string
+    + DistributorURL: string
+    + DataSheetURL: string
+    + Description: string
+    + DeletedAt: gorm.DeletedAt {soft delete}
+  }
+
+  class ItemCategory <<entity>> {
+    + ID: uuid.UUID {PK}
+    + CategoryName: string
+    + ParentID: *uuid.UUID {FK, nullable}
+    + ParentCategory: *ItemCategory
+  }
+
+  class Changelog <<entity>> {
+    + ID: int {PK}
+    + UserID: uuid.UUID
+    + ItemID: uuid.UUID {FK}
+    + Quantity: int32 {change in quantity}
+    + Action: ChangelogAction
+    + ChangeTime: time.Time
+    + Description: string
+  }
+
+  enum ChangelogAction <<enum>> {
+    CREATE
+    TAKEN
+    ADDED
+    MODIFIED
+    DELETE
+  }
+
+  class CreateItemReq <<dto>> {
+    + ItemName: string {required}
+    + Quantity: *int32 {required}
+    + Manufacturer: string {required}
+    + ManufacturerPart: string {required}
+    + Categories: *[]uuid.UUID
+    + DistributorPart: string
+    + DistributorURL: string
+    + DataSheetURL: string
+    + Description: string
+    + LogDescription: string
+  }
+
+  class UpdateItemReq <<dto>> {
+    + ItemName: *string
+    + Quantity: *int32
+    + Manufacturer: *string
+    + ManufacturerPart: *string
+    + Categories: *[]uuid.UUID
+    + DistributorPart: *string
+    + DistributorURL: *string
+    + ItemDescription: *string
+    + DataSheetURL: *string
+    + LogDescription: *string
+  }
+
+  class CreateItemCategoryReq <<dto>> {
+    + CategoryName: string {required}
+    + ParentID: *uuid.UUID
+  }
+
+  class MoveCategoryReq <<dto>> {
+    + ParentID: json.RawMessage {required, uuid or null}
+  }
+
+  class ItemDTO <<dto>> {
+    + ItemName: string
+    + Quantity: int32
+    + ManufacturerPart: string
+  }
+
+  class InventoryHandlers <<module>> {
+    + GetItems(c, db)
+    + GetItemByID(c, db)
+    + AddItem(c, db)
+    + UpdateItem(c, db)
+    + DeleteItem(c, db)
+    + GetCategories(c, db)
+    + GetCategoryByID(c, db)
+    + CreateCategory(c, db)
+    + MoveCategory(c, db)
+    + DeleteCategory(c, db)
+    + GetLogs(c, db)
+    - createNewItem(req: UpdateItemReq): map[string]interface{}
+  }
+}
+
+' ---------------------------------------------------------------- settings
+package "settings" {
+  class Setting <<entity>> {
+    + Name: string {PK}
+    + Value: string
+    ..
+    defaults:
+      signup_policy = "whitelist"  (open | whitelist | closed)
+      whitelisted_email_domains = ["mun.ca"]
+  }
+
+  class PatchSettingsRequest <<dto>> {
+    map[string]*string
+  }
+
+  class CreateSettingRequest <<dto>> {
+    + Name: string
+    + Value: *string
+  }
+
+  class SettingsHandlers <<module>> {
+    + GetSettings(c, db)
+    + CreateSetting(c, db)
+    + PatchSettings(c, db)
+  }
+
+  class SettingsService <<module>> {
+    + SeedDefaults(db): error
+    + Get(db, name: string): (string, error)
+    + Set(db, name, value: string): error
+  }
+}
+
+' ================================================================ relationships
+
+' --- entity associations (database relationships)
+User "1" *-- "0..*" UserSession : owns >\n(ON DELETE CASCADE)
+User "1" *-- "0..*" UserPermission : granted >\n(ON DELETE CASCADE)
+UserPermission ..> Permission : value is one of >
+
+Item "0..*" -- "0..*" ItemCategory : categorized as >\n(join table ItemCategoryLinks)
+ItemCategory "0..*" --> "0..1" ItemCategory : parent >
+Changelog "0..*" --> "1" Item : records change to >\n(ON DELETE RESTRICT)
+Changelog "0..*" ..> "1" User : performed by >\n(UserID, no FK)
+Changelog --> ChangelogAction
+
+' --- wiring
+Main ..> Database : <<use>>
+Main ..> Routes : <<use>>
+Routes ..> AuthMiddleware : <<use>>
+Routes ..> CORSMiddleware : <<use>>
+Routes ..> AuthHandlers : <<route>>
+Routes ..> InventoryHandlers : <<route>>
+Routes ..> SettingsHandlers : <<route>>
+
+Database ..> User : migrates
+Database ..> Item : migrates
+Database ..> Setting : migrates
+Database ..> SettingsService : SeedDefaults
+
+AuthMiddleware ..> AuthService : <<use>>
+AuthMiddleware ..> UserSession : validates
+
+AuthHandlers ..> AuthService : <<use>>
+AuthHandlers ..> PutPermissionsRequest : binds
+AuthHandlers ..> PatchUserRequest : binds
+AuthService ..> SettingsService : signup policy
+AuthService ..> User : creates
+AuthService ..> UserSession : creates
+
+InventoryHandlers ..> AuthService : HasPermission
+InventoryHandlers ..> CreateItemReq : binds
+InventoryHandlers ..> UpdateItemReq : binds
+InventoryHandlers ..> CreateItemCategoryReq : binds
+InventoryHandlers ..> MoveCategoryReq : binds
+InventoryHandlers ..> Item : CRUD
+InventoryHandlers ..> ItemCategory : CRUD
+InventoryHandlers ..> Changelog : writes / reads
+
+SettingsHandlers ..> SettingsService : <<use>>
+SettingsHandlers ..> PatchSettingsRequest : binds
+SettingsHandlers ..> CreateSettingRequest : binds
+SettingsService ..> Setting : reads / writes
+
+@enduml
