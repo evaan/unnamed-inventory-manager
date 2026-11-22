@@ -1,0 +1,36 @@
+Frontend tests: bun run test (vitest run)
+Source: GitHub Actions CI run 44962664320, job "frontend / test" (job id 137024782993)
+https://github.com/evaan/unnamed-inventory-manager/actions/runs/44962664320/job/137024782993
+Commit: 0c12086 (same code as main), run started 2026-11-21 23:36 UTC, runner ubuntu-latest
+Exported: 2026-11-21. Timestamps and colour codes removed; output otherwise unchanged.
+
+##[group]Run bun run test
+bun run test
+shell: /usr/bin/bash -e {0}
+$ vitest run
+
+ RUN  v3.2.7 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/frontend
+
+ ✓ src/pages/SettingsPage.test.tsx (10 tests) 1437ms
+ ✓ src/features/bookings/BookingSchedule.test.tsx (9 tests) 732ms
+ ✓ src/features/bookings/bookingsapi.test.ts (7 tests) 109ms
+ ✓ src/pages/MainPage.test.tsx (34 tests) 4485ms
+   ✓ MainPage: new item > saves trimmed values, an integer quantity, and selected categories with the new item  323ms
+   ✓ MainPage: editing item details > keeps category changes in the edit form until saved  313ms
+   ✓ MainPage: category permissions > nests a category by dragging, and includes it in its parent filter  303ms
+ ✓ src/features/bookings/bookingTime.test.ts (7 tests) 8ms
+ ✓ src/components/ThemeToggle.test.tsx (2 tests) 156ms
+ ✓ src/pages/BookingsPage.test.tsx (32 tests) 5989ms
+   ✓ BookingsPage: loading and recovery > shows loading feedback until the schedule is ready  489ms
+   ✓ BookingsPage: loading and recovery > keeps a failed booking form intact for retry  387ms
+   ✓ BookingsPage: schedule and reservations > creates a reservation from a free slot and shows it in My bookings  406ms
+ ✓ src/hooks/useUnsavedChanges.test.tsx (1 test) 278ms
+ ✓ src/components/ConfirmProvider.test.tsx (1 test) 173ms
+ ✓ src/components/PageHeader.test.tsx (2 tests) 169ms
+ ✓ src/pages/LoginPage.test.tsx (1 test) 114ms
+
+ Test Files  11 passed (11)
+      Tests  106 passed (106)
+   Start at  23:37:32
+   Duration  8.63s (transform 607ms, setup 646ms, collect 2.72s, tests 13.65s, environment 5.77s, prepare 854ms)
+

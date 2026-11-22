@@ -1,0 +1,23 @@
+Backend API contract check: swag init + git diff --exit-code -- docs/
+Source: GitHub Actions CI run 44962664320, job "backend / swagger" (job id 137024948677)
+https://github.com/evaan/unnamed-inventory-manager/actions/runs/44962664320/job/137024948677
+Commit: 0c12086 (same code as main), run started 2026-11-21 23:36 UTC, runner ubuntu-latest
+Exported: 2026-11-21. Timestamps and colour codes removed; output otherwise unchanged.
+
+##[group]Run $(go env GOPATH)/bin/swag init -g main.go -o docs
+$(go env GOPATH)/bin/swag init -g main.go -o docs
+git diff --exit-code -- docs/
+shell: /usr/bin/bash -e {0}
+2026/11/21 23:38:17 Generate swagger docs....
+2026/11/21 23:38:17 Generate general API Info, search dir:./
+2026/11/21 23:38:17 Generating auth.PutPermissionsRequest
+2026/11/21 23:38:17 Generating auth.PatchUserRequest
+2026/11/21 23:38:17 Generating inventory.CreateItemReq
+2026/11/21 23:38:17 Generating inventory.CreateItemCategoryReq
+2026/11/21 23:38:17 Generating inventory.MoveCategoryReq
+2026/11/21 23:38:17 Generating inventory.UpdateItemReq
+2026/11/21 23:38:17 Generating settings.CreateSettingRequest
+2026/11/21 23:38:17 Generating settings.PatchSettingsRequest
+2026/11/21 23:38:17 create docs.go at docs/docs.go
+2026/11/21 23:38:17 create swagger.json at docs/swagger.json
+2026/11/21 23:38:17 create swagger.yaml at docs/swagger.yaml

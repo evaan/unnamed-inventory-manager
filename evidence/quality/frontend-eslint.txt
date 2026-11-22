@@ -1,0 +1,10 @@
+Frontend lint: bun run lint (eslint .)
+Source: GitHub Actions CI run 44962664320, job "frontend / lint" (job id 137024783025)
+https://github.com/evaan/unnamed-inventory-manager/actions/runs/44962664320/job/137024783025
+Commit: 0c12086 (same code as main), run started 2026-11-21 23:36 UTC, runner ubuntu-latest
+Exported: 2026-11-21. Timestamps and colour codes removed; output otherwise unchanged.
+
+##[group]Run bun run lint
+bun run lint
+shell: /usr/bin/bash -e {0}
+$ eslint .
