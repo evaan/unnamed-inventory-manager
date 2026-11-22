@@ -20,6 +20,7 @@ jobs:
     needs: [backend, frontend]
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
       pull-requests: write
     env:
@@ -34,3 +35,12 @@ jobs:
             exit 0
           fi
           gh pr merge "$pr_number" --repo "$GITHUB_REPOSITORY" --squash --delete-branch --auto
+
+          # A merge made with GITHUB_TOKEN does not fire the "push" event on main,
+          # so start the Deliver workflow explicitly once the PR has merged.
+          state="$(gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" --json state --jq .state)"
+          if [ "$state" = "MERGED" ]; then
+            gh workflow run deliver.yml --repo "$GITHUB_REPOSITORY" --ref main
+          else
+            echo "PR #$pr_number will merge when its checks pass; run the Deliver workflow by hand afterwards."
+          fi

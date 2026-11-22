@@ -12,7 +12,7 @@ Live deployment: https://inventory.evaan.dev
 | `frontend/` | React and TypeScript single-page app (Vite, Tailwind, TanStack Query) with Vitest tests next to the code |
 | `compose.yml` | Production stack: Traefik, a Docker socket proxy, the frontend, the backend and PostgreSQL |
 | `justfile` | `just dev` starts the backend and frontend in development mode |
-| `.github/workflows/` | CI: build, test, lint, format and Swagger checks, then auto-merge |
+| `.github/workflows/` | CI (build, test, lint, format and Swagger checks, then auto-merge) and Deliver (publish images, deploy to production) |
 | `docs/` | User guide, maintenance guide and operations guide |
 | `Permissions.md` | List of the user permissions and what each one allows |
 
@@ -28,7 +28,7 @@ Live deployment: https://inventory.evaan.dev
 git clone git@github.com:evaan/unnamed-inventory-manager.git
 cd unnamed-inventory-manager
 cp .env.example .env
-# Edit .env: set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and ADMIN_EMAIL.
+# Edit .env: set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, POSTGRES_PASSWORD and ADMIN_EMAIL.
 # For a local run, also add:
 #   GOOGLE_REDIRECT_URL=http://localhost:8381/api/callback
 #   FRONTEND_URL=http://localhost:8381/app
@@ -57,7 +57,7 @@ cd backend && go test ./... && go vet ./... && gofmt -l .
 cd frontend && bun run test && bun run lint && bun run build
 ```
 
-CI runs the same checks on every push to a branch other than `main`.
+CI runs the same checks on every push to a branch other than `main`. After a merge, the Deliver workflow runs them again, publishes the images and deploys them. See the [operations guide](docs/operations-guide.md).
 
 ## Documentation
 
