@@ -28,7 +28,7 @@ main ──► Deliver: checks again ──► build + push images (tag = SHA) �
                      backup DB ─► checkout SHA ─► pull ─► up -d ─► health check ─► (fail) roll back
 ```
 
-- **CI** (`.github/workflows/auto-merge.yml`) runs on every branch push. When it passes, it merges the open PR into `main` and starts **Deliver**.
+- **CI** (`.github/workflows/auto-merge.yml`) runs on every branch push. When it passes, it merges the open PR into `main`.
 - **Deliver** (`.github/workflows/deliver.yml`) runs on every push to `main`, or by hand from the Actions tab. It runs the same checks on the merged commit and publishes both images to GitHub Container Registry (GHCR). It then deploys that commit on the production host.
 - The deploy job runs on a **self-hosted runner** on the production host. The runner only makes outbound HTTPS connections to GitHub, so the host opens no SSH port and GitHub stores no SSH key.
 - The deploy job belongs to the GitHub **environment** `production`, so every deployment is listed under *Deployments* in the repository. You can also add a required reviewer there, so that a person must approve each release.
