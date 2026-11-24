@@ -1,0 +1,21 @@
+Backend static analysis: gofmt -l . and go vet ./...
+Source: GitHub Actions CI run 44962664320, job "backend / stylecheck" (job id 137024948576)
+https://github.com/evaan/unnamed-inventory-manager/actions/runs/44962664320/job/137024948576
+Commit: 0c12086 (same code as main), run started 2026-11-21 23:36 UTC, runner ubuntu-latest
+Exported: 2026-11-21. Timestamps and colour codes removed; output otherwise unchanged.
+
+##[group]Run gofmt -l . | tee /tmp/fmt
+gofmt -l . | tee /tmp/fmt
+test ! -s /tmp/fmt
+shell: /usr/bin/bash -e {0}
+
+##[group]Run go vet ./...
+go vet ./...
+shell: /usr/bin/bash -e {0}
+go: downloading gorm.io/driver/sqlite v1.6.0
+go: downloading github.com/mattn/go-sqlite3 v1.14.22
+# github.com/mattn/go-sqlite3
+sqlite3-binding.c: In function ‘sqlite3ShadowTableName’:
+sqlite3-binding.c:123133:9: warning: assignment discards ‘const’ qualifier from pointer target type [-Wdiscarded-qualifiers]
+123133 |   zTail = strrchr(zName, '_');
+       |         ^

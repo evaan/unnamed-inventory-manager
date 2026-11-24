@@ -1,0 +1,372 @@
+Backend tests: go test ./... -v
+Source: GitHub Actions CI run 44962664320, job "backend / test" (job id 137024948654)
+https://github.com/evaan/unnamed-inventory-manager/actions/runs/44962664320/job/137024948654
+Commit: 0c12086 (same code as main), run started 2026-11-21 23:36 UTC, runner ubuntu-latest
+Exported: 2026-11-21. Timestamps and colour codes removed; output otherwise unchanged.
+
+##[group]Run go test ./... -v
+go test ./... -v
+shell: /usr/bin/bash -e {0}
+go: downloading gorm.io/driver/sqlite v1.6.0
+go: downloading github.com/mattn/go-sqlite3 v1.14.22
+?   	github.com/evaandev/unnamed-inventory-manager	[no test files]
+?   	github.com/evaandev/unnamed-inventory-manager/auth	[no test files]
+?   	github.com/evaandev/unnamed-inventory-manager/database	[no test files]
+?   	github.com/evaandev/unnamed-inventory-manager/docs	[no test files]
+?   	github.com/evaandev/unnamed-inventory-manager/inventory	[no test files]
+?   	github.com/evaandev/unnamed-inventory-manager/middleware	[no test files]
+?   	github.com/evaandev/unnamed-inventory-manager/routes	[no test files]
+?   	github.com/evaandev/unnamed-inventory-manager/settings	[no test files]
+# github.com/mattn/go-sqlite3
+sqlite3-binding.c: In function ‘sqlite3ShadowTableName’:
+sqlite3-binding.c:123133:9: warning: assignment discards ‘const’ qualifier from pointer target type [-Wdiscarded-qualifiers]
+123133 |   zTail = strrchr(zName, '_');
+       |         ^
+=== RUN   TestWhoAmIUnauthenticated
+--- PASS: TestWhoAmIUnauthenticated (0.00s)
+=== RUN   TestWhoAmIRegularUser
+--- PASS: TestWhoAmIRegularUser (0.00s)
+=== RUN   TestWhoAmIDisabledUser
+--- PASS: TestWhoAmIDisabledUser (0.00s)
+=== RUN   TestGetPermissions
+--- PASS: TestGetPermissions (0.00s)
+=== RUN   TestGetPermissionsUnauthenticated
+--- PASS: TestGetPermissionsUnauthenticated (0.00s)
+=== RUN   TestGetUserPermissions
+--- PASS: TestGetUserPermissions (0.00s)
+=== RUN   TestGetUnknownUserPermissions
+--- PASS: TestGetUnknownUserPermissions (0.00s)
+=== RUN   TestGetUserPermissionsInvalidID
+--- PASS: TestGetUserPermissionsInvalidID (0.00s)
+=== RUN   TestSetPermissions
+--- PASS: TestSetPermissions (0.00s)
+=== RUN   TestClearPermissions
+--- PASS: TestClearPermissions (0.00s)
+=== RUN   TestBookingPermissionsRoundTrip
+--- PASS: TestBookingPermissionsRoundTrip (0.00s)
+=== RUN   TestRegularUserCannotSetPermissions
+--- PASS: TestRegularUserCannotSetPermissions (0.00s)
+=== RUN   TestRemovingAdminBlocksAdminActions
+--- PASS: TestRemovingAdminBlocksAdminActions (0.00s)
+=== RUN   TestAdminCannotRemoveOwnAdministrator
+=== RUN   TestAdminCannotRemoveOwnAdministrator/{"permissions":[]}
+=== RUN   TestAdminCannotRemoveOwnAdministrator/{"permissions":["View"]}
+=== RUN   TestAdminCannotRemoveOwnAdministrator/{"permissions":null}
+=== RUN   TestAdminCannotRemoveOwnAdministrator/{}
+--- PASS: TestAdminCannotRemoveOwnAdministrator (0.01s)
+    --- PASS: TestAdminCannotRemoveOwnAdministrator/{"permissions":[]} (0.00s)
+    --- PASS: TestAdminCannotRemoveOwnAdministrator/{"permissions":["View"]} (0.00s)
+    --- PASS: TestAdminCannotRemoveOwnAdministrator/{"permissions":null} (0.00s)
+    --- PASS: TestAdminCannotRemoveOwnAdministrator/{} (0.00s)
+=== RUN   TestAdminCanUpdateOwnOtherPermissions
+--- PASS: TestAdminCanUpdateOwnOtherPermissions (0.00s)
+=== RUN   TestGetUsers
+--- PASS: TestGetUsers (0.00s)
+=== RUN   TestGetUsersIncludesDisabledUsers
+--- PASS: TestGetUsersIncludesDisabledUsers (0.00s)
+=== RUN   TestGetUsersEmpty
+--- PASS: TestGetUsersEmpty (0.00s)
+=== RUN   TestGetUsersUnauthenticated
+--- PASS: TestGetUsersUnauthenticated (0.00s)
+=== RUN   TestRegularUserCannotGetUsers
+--- PASS: TestRegularUserCannotGetUsers (0.00s)
+=== RUN   TestDisabledAdminCannotGetUsers
+--- PASS: TestDisabledAdminCannotGetUsers (0.00s)
+=== RUN   TestGetUser
+--- PASS: TestGetUser (0.00s)
+=== RUN   TestGetUserWithoutPermissions
+--- PASS: TestGetUserWithoutPermissions (0.00s)
+=== RUN   TestGetDisabledUser
+--- PASS: TestGetDisabledUser (0.00s)
+=== RUN   TestGetUnknownUser
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/user.go:34 record not found
+[0.028ms] [rows:0] SELECT * FROM `users` WHERE id = "d7fa871c-d426-4987-84dd-b03e98cc317b" ORDER BY `users`.`id` LIMIT 1
+--- PASS: TestGetUnknownUser (0.00s)
+=== RUN   TestGetUserInvalidID
+--- PASS: TestGetUserInvalidID (0.00s)
+=== RUN   TestGetUserUnauthenticated
+--- PASS: TestGetUserUnauthenticated (0.00s)
+=== RUN   TestRegularUserCannotGetUser
+--- PASS: TestRegularUserCannotGetUser (0.00s)
+=== RUN   TestDisabledAdminCannotGetUser
+--- PASS: TestDisabledAdminCannotGetUser (0.00s)
+=== RUN   TestDisableAndEnableUser
+--- PASS: TestDisableAndEnableUser (0.00s)
+=== RUN   TestRegularUserCannotDisableUser
+--- PASS: TestRegularUserCannotDisableUser (0.00s)
+=== RUN   TestLogout
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/middleware/auth.go:24 record not found
+[0.037ms] [rows:0] SELECT * FROM `user_sessions` WHERE session_token = "8f5d3f8b8e6df2f85668fe5653f954462cb40f8fd9d5ab45e6fb56e9e49f5186" ORDER BY `user_sessions`.`id` LIMIT 1
+--- PASS: TestLogout (0.00s)
+=== RUN   TestInventoryReadsRequireActiveSession
+=== RUN   TestInventoryReadsRequireActiveSession//items
+=== RUN   TestInventoryReadsRequireActiveSession//items/anonymous
+=== RUN   TestInventoryReadsRequireActiveSession//items/invalid
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/middleware/auth.go:79 record not found
+[0.040ms] [rows:0] SELECT * FROM `user_sessions` WHERE session_token = "ccf362d60b73922a9203beb1271da06b48661cf98beb3f037bb03cb50068f096" ORDER BY `user_sessions`.`id` LIMIT 1
+=== RUN   TestInventoryReadsRequireActiveSession//items/expired
+=== RUN   TestInventoryReadsRequireActiveSession//items/disabled
+=== RUN   TestInventoryReadsRequireActiveSession//items/active
+=== RUN   TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b
+=== RUN   TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b/anonymous
+=== RUN   TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b/invalid
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/middleware/auth.go:79 record not found
+[0.035ms] [rows:0] SELECT * FROM `user_sessions` WHERE session_token = "ccf362d60b73922a9203beb1271da06b48661cf98beb3f037bb03cb50068f096" ORDER BY `user_sessions`.`id` LIMIT 1
+=== RUN   TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b/expired
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/middleware/auth.go:79 record not found
+[0.031ms] [rows:0] SELECT * FROM `user_sessions` WHERE session_token = "fdcba479ba966b4a39fa86d711eeb153c10c2ed322e93dece5dc080d98a2b95f" ORDER BY `user_sessions`.`id` LIMIT 1
+=== RUN   TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b/disabled
+=== RUN   TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b/active
+=== RUN   TestInventoryReadsRequireActiveSession//categories
+=== RUN   TestInventoryReadsRequireActiveSession//categories/anonymous
+=== RUN   TestInventoryReadsRequireActiveSession//categories/invalid
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/middleware/auth.go:79 record not found
+[0.052ms] [rows:0] SELECT * FROM `user_sessions` WHERE session_token = "ccf362d60b73922a9203beb1271da06b48661cf98beb3f037bb03cb50068f096" ORDER BY `user_sessions`.`id` LIMIT 1
+=== RUN   TestInventoryReadsRequireActiveSession//categories/expired
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/middleware/auth.go:79 record not found
+[0.038ms] [rows:0] SELECT * FROM `user_sessions` WHERE session_token = "fdcba479ba966b4a39fa86d711eeb153c10c2ed322e93dece5dc080d98a2b95f" ORDER BY `user_sessions`.`id` LIMIT 1
+=== RUN   TestInventoryReadsRequireActiveSession//categories/disabled
+=== RUN   TestInventoryReadsRequireActiveSession//categories/active
+=== RUN   TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9
+=== RUN   TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9/anonymous
+=== RUN   TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9/invalid
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/middleware/auth.go:79 record not found
+[0.046ms] [rows:0] SELECT * FROM `user_sessions` WHERE session_token = "ccf362d60b73922a9203beb1271da06b48661cf98beb3f037bb03cb50068f096" ORDER BY `user_sessions`.`id` LIMIT 1
+=== RUN   TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9/expired
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/middleware/auth.go:79 record not found
+[0.042ms] [rows:0] SELECT * FROM `user_sessions` WHERE session_token = "fdcba479ba966b4a39fa86d711eeb153c10c2ed322e93dece5dc080d98a2b95f" ORDER BY `user_sessions`.`id` LIMIT 1
+=== RUN   TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9/disabled
+=== RUN   TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9/active
+=== RUN   TestInventoryReadsRequireActiveSession//logs
+=== RUN   TestInventoryReadsRequireActiveSession//logs/anonymous
+=== RUN   TestInventoryReadsRequireActiveSession//logs/invalid
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/middleware/auth.go:79 record not found
+[0.045ms] [rows:0] SELECT * FROM `user_sessions` WHERE session_token = "ccf362d60b73922a9203beb1271da06b48661cf98beb3f037bb03cb50068f096" ORDER BY `user_sessions`.`id` LIMIT 1
+=== RUN   TestInventoryReadsRequireActiveSession//logs/expired
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/middleware/auth.go:79 record not found
+[0.037ms] [rows:0] SELECT * FROM `user_sessions` WHERE session_token = "fdcba479ba966b4a39fa86d711eeb153c10c2ed322e93dece5dc080d98a2b95f" ORDER BY `user_sessions`.`id` LIMIT 1
+=== RUN   TestInventoryReadsRequireActiveSession//logs/disabled
+=== RUN   TestInventoryReadsRequireActiveSession//logs/active
+--- PASS: TestInventoryReadsRequireActiveSession (0.01s)
+    --- PASS: TestInventoryReadsRequireActiveSession//items (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//items/anonymous (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//items/invalid (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//items/expired (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//items/disabled (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//items/active (0.00s)
+    --- PASS: TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b/anonymous (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b/invalid (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b/expired (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b/disabled (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//items/0eee3f3c-4cda-40bd-8c17-afb95df4f33b/active (0.00s)
+    --- PASS: TestInventoryReadsRequireActiveSession//categories (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//categories/anonymous (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//categories/invalid (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//categories/expired (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//categories/disabled (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//categories/active (0.00s)
+    --- PASS: TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9 (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9/anonymous (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9/invalid (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9/expired (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9/disabled (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//categories/1399d0b2-67cf-4b09-a478-acc9ee17d3e9/active (0.00s)
+    --- PASS: TestInventoryReadsRequireActiveSession//logs (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//logs/anonymous (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//logs/invalid (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//logs/expired (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//logs/disabled (0.00s)
+        --- PASS: TestInventoryReadsRequireActiveSession//logs/active (0.00s)
+=== RUN   TestAddItem
+--- PASS: TestAddItem (0.00s)
+=== RUN   TestAddInvalidItem
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/tests/inventory_test.go:143 record not found
+[0.036ms] [rows:0] SELECT * FROM `items` WHERE id = "00000000-0000-0000-0000-000000000000" AND `items`.`deleted_at` IS NULL ORDER BY `items`.`id` LIMIT 1
+--- PASS: TestAddInvalidItem (0.00s)
+=== RUN   TestGetItem
+--- PASS: TestGetItem (0.00s)
+=== RUN   TestGetNonExistentItem
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/inventory/getitembyid.go:40 record not found
+[0.035ms] [rows:0] SELECT * FROM `items` WHERE id = "e892524e-6f96-4e0c-b4f3-44dd8666299e" AND `items`.`deleted_at` IS NULL ORDER BY `items`.`id` LIMIT 1
+--- PASS: TestGetNonExistentItem (0.00s)
+=== RUN   TestEditItem
+--- PASS: TestEditItem (0.00s)
+=== RUN   TestRemoveItem
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/tests/inventory_test.go:298 record not found
+[0.045ms] [rows:0] SELECT * FROM `items` WHERE id = "2a6fa07b-1f8b-4df3-bb15-fe24b0cf4a98" AND `items`.`deleted_at` IS NULL ORDER BY `items`.`id` LIMIT 1
+--- PASS: TestRemoveItem (0.00s)
+=== RUN   TestCreateAndDeleteCategory
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/inventory/deletecategory.go:33 record not found
+[0.037ms] [rows:0] SELECT * FROM `item_categories` WHERE id = "aa350938-f9cc-4480-8b91-344b3b0e4d91" ORDER BY `item_categories`.`id` LIMIT 1 
+--- PASS: TestCreateAndDeleteCategory (0.01s)
+=== RUN   TestAddSubCategory
+--- PASS: TestAddSubCategory (0.01s)
+=== RUN   TestAddItemWithCategory
+--- PASS: TestAddItemWithCategory (0.00s)
+=== RUN   TestAttachCategoryByUpdatingItem
+--- PASS: TestAttachCategoryByUpdatingItem (0.00s)
+=== RUN   TestAttachInvalidCategory
+--- PASS: TestAttachInvalidCategory (0.00s)
+=== RUN   TestNoNewFieldsItem
+--- PASS: TestNoNewFieldsItem (0.00s)
+=== RUN   TestGetCategories
+--- PASS: TestGetCategories (0.00s)
+=== RUN   TestGetCategoryByID
+--- PASS: TestGetCategoryByID (0.00s)
+=== RUN   TestInventoryRequiresPermissions
+--- PASS: TestInventoryRequiresPermissions (0.00s)
+=== RUN   TestAdministratorCanModifyItem
+--- PASS: TestAdministratorCanModifyItem (0.00s)
+=== RUN   TestDisabledUserCannotModifyItem
+--- PASS: TestDisabledUserCannotModifyItem (0.00s)
+=== RUN   TestGetDefaultSettings
+--- PASS: TestGetDefaultSettings (0.00s)
+=== RUN   TestGetSettingsIncludesNewSettings
+--- PASS: TestGetSettingsIncludesNewSettings (0.00s)
+=== RUN   TestGetSettingsEmpty
+--- PASS: TestGetSettingsEmpty (0.00s)
+=== RUN   TestPatchSettings
+--- PASS: TestPatchSettings (0.00s)
+=== RUN   TestPatchSettingsPreservesOmittedSettings
+--- PASS: TestPatchSettingsPreservesOmittedSettings (0.00s)
+=== RUN   TestPatchSettingsEmptyValue
+--- PASS: TestPatchSettingsEmptyValue (0.00s)
+=== RUN   TestPatchSettingsUnchangedValue
+--- PASS: TestPatchSettingsUnchangedValue (0.00s)
+=== RUN   TestPatchSettingsUnknownSetting
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/settings/util.go:19 record not found
+[0.021ms] [rows:0] SELECT * FROM `settings` WHERE name = "unknown" ORDER BY `settings`.`name` LIMIT 1
+--- PASS: TestPatchSettingsUnknownSetting (0.00s)
+=== RUN   TestPatchSettingsInvalidBody
+--- PASS: TestPatchSettingsInvalidBody (0.00s)
+=== RUN   TestGetSettingsUnauthenticated
+--- PASS: TestGetSettingsUnauthenticated (0.00s)
+=== RUN   TestPatchSettingsUnauthenticated
+--- PASS: TestPatchSettingsUnauthenticated (0.00s)
+=== RUN   TestRegularUserCannotGetSettings
+--- PASS: TestRegularUserCannotGetSettings (0.00s)
+=== RUN   TestRegularUserCannotPatchSettings
+--- PASS: TestRegularUserCannotPatchSettings (0.00s)
+=== RUN   TestDisabledAdminCannotGetSettings
+--- PASS: TestDisabledAdminCannotGetSettings (0.00s)
+=== RUN   TestDisabledAdminCannotPatchSettings
+--- PASS: TestDisabledAdminCannotPatchSettings (0.00s)
+=== RUN   TestPatchSettingsRequiresOrigin
+--- PASS: TestPatchSettingsRequiresOrigin (0.00s)
+=== RUN   TestPatchSettingsRollsBackOnError
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/settings/settings.go:133 test error
+[0.053ms] [rows:0] UPDATE `settings` SET `value`="new" WHERE name = "second"
+--- PASS: TestPatchSettingsRollsBackOnError (0.00s)
+=== RUN   TestGetSettingsDatabaseError
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/settings/settings.go:29 no such table: settings
+[0.016ms] [rows:0] SELECT * FROM `settings`
+--- PASS: TestGetSettingsDatabaseError (0.00s)
+=== RUN   TestSettingsMigrationPreservesUpdates
+--- PASS: TestSettingsMigrationPreservesUpdates (0.00s)
+=== RUN   TestCreateSetting
+--- PASS: TestCreateSetting (0.00s)
+=== RUN   TestCreateSettingInvalidBody
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/settings/util.go:19 record not found
+[0.025ms] [rows:0] SELECT * FROM `settings` WHERE name = "test" ORDER BY `settings`.`name` LIMIT 1
+--- PASS: TestCreateSettingInvalidBody (0.00s)
+=== RUN   TestRegularUserCannotCreateSetting
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/settings/util.go:19 record not found
+[0.025ms] [rows:0] SELECT * FROM `settings` WHERE name = "test" ORDER BY `settings`.`name` LIMIT 1
+--- PASS: TestRegularUserCannotCreateSetting (0.00s)
+=== RUN   TestSignupOpen
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.037ms] [rows:0] SELECT * FROM `users` WHERE google_id = "1cab4623-d5f5-468b-bc43-5d7ac3a6a9df" ORDER BY `users`.`id` LIMIT 1
+--- PASS: TestSignupOpen (0.00s)
+=== RUN   TestSignupWhitelistedEmail
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.040ms] [rows:0] SELECT * FROM `users` WHERE google_id = "662c7bcf-547c-4e28-9cff-68891265ea26" ORDER BY `users`.`id` LIMIT 1
+--- PASS: TestSignupWhitelistedEmail (0.00s)
+=== RUN   TestSignupOutsideWhitelist
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.030ms] [rows:0] SELECT * FROM `users` WHERE google_id = "3033dd51-88ad-470d-b3db-f969ce4162cb" ORDER BY `users`.`id` LIMIT 1
+--- PASS: TestSignupOutsideWhitelist (0.00s)
+=== RUN   TestSignupWhitelistExactDomain
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.047ms] [rows:0] SELECT * FROM `users` WHERE google_id = "20659b32-dd7c-477f-8e73-8e4ea2f90b1f" ORDER BY `users`.`id` LIMIT 1
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.035ms] [rows:0] SELECT * FROM `users` WHERE google_id = "85dacced-1832-4527-96d3-4d6683ed2eaf" ORDER BY `users`.`id` LIMIT 1
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.037ms] [rows:0] SELECT * FROM `users` WHERE google_id = "d44ce83a-4747-47c2-88bc-1b51d821f44a" ORDER BY `users`.`id` LIMIT 1
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.024ms] [rows:0] SELECT * FROM `users` WHERE google_id = "3ac81c9e-a20e-40a3-980b-2e02e8a50a35" ORDER BY `users`.`id` LIMIT 1
+--- PASS: TestSignupWhitelistExactDomain (0.00s)
+=== RUN   TestSignupClosed
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.031ms] [rows:0] SELECT * FROM `users` WHERE google_id = "f367b2e5-f2b5-4eec-99f7-c0d61847578e" ORDER BY `users`.`id` LIMIT 1
+--- PASS: TestSignupClosed (0.00s)
+=== RUN   TestSignupInvalidPolicy
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.034ms] [rows:0] SELECT * FROM `users` WHERE google_id = "test-google-id" ORDER BY `users`.`id` LIMIT 1
+--- PASS: TestSignupInvalidPolicy (0.00s)
+=== RUN   TestSignupInvalidWhitelist
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.044ms] [rows:0] SELECT * FROM `users` WHERE google_id = "test-google-id" ORDER BY `users`.`id` LIMIT 1
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.042ms] [rows:0] SELECT * FROM `users` WHERE google_id = "test-google-id" ORDER BY `users`.`id` LIMIT 1
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.036ms] [rows:0] SELECT * FROM `users` WHERE google_id = "test-google-id" ORDER BY `users`.`id` LIMIT 1
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.026ms] [rows:0] SELECT * FROM `users` WHERE google_id = "test-google-id" ORDER BY `users`.`id` LIMIT 1
+--- PASS: TestSignupInvalidWhitelist (0.00s)
+=== RUN   TestExistingEnabledUserCanLoginWithClosedSignup
+--- PASS: TestExistingEnabledUserCanLoginWithClosedSignup (0.00s)
+=== RUN   TestExistingDisabledUserStaysDisabledWithOpenSignup
+--- PASS: TestExistingDisabledUserStaysDisabledWithOpenSignup (0.00s)
+=== RUN   TestSignupBootstrapAdminBypassesWhitelist
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.031ms] [rows:0] SELECT * FROM `users` WHERE google_id = "1c25359b-9805-4eb3-bb9d-e89b79b25ef2" ORDER BY `users`.`id` LIMIT 1
+--- PASS: TestSignupBootstrapAdminBypassesWhitelist (0.00s)
+=== RUN   TestSignupBootstrapAdminBypassesClosedSignup
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.030ms] [rows:0] SELECT * FROM `users` WHERE google_id = "93560772-4a2f-4d0b-aa6d-a34210916582" ORDER BY `users`.`id` LIMIT 1
+--- PASS: TestSignupBootstrapAdminBypassesClosedSignup (0.00s)
+=== RUN   TestSignupEmptyAdminEmailDoesNotBypassPolicy
+
+2026/11/21 23:39:03 /home/runner/work/unnamed-inventory-manager/unnamed-inventory-manager/backend/auth/session.go:19 record not found
+[0.034ms] [rows:0] SELECT * FROM `users` WHERE google_id = "32599671-3bb1-44e8-9fbd-6940e9c001f2" ORDER BY `users`.`id` LIMIT 1
+--- PASS: TestSignupEmptyAdminEmailDoesNotBypassPolicy (0.00s)
+=== RUN   TestExistingDisabledBootstrapAdminStaysDisabled
+--- PASS: TestExistingDisabledBootstrapAdminStaysDisabled (0.00s)
+PASS
+ok  	github.com/evaandev/unnamed-inventory-manager/tests	0.257s

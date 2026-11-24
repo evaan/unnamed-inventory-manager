@@ -1,0 +1,620 @@
+@startuml frontend-class
+' Frontend class diagram (React 18, TypeScript, React Router, TanStack Query, Vite)
+'
+' The frontend uses function components and modules, not ES classes. In this diagram:
+'   <<component>>  React function component; attributes are its props
+'   <<page>>       routed page component
+'   <<hook>>       custom React hook
+'   <<service>>    API client module (functions that call the backend)
+'   <<module>>     plain TypeScript helper module
+'   <<interface>>  TypeScript interface or type alias
+'   <<context>>    React context
+' Composition (*--) means "renders as a child". Dashed arrows mean "uses".
+
+title Unnamed Inventory Manager: Frontend Class Diagram
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+hide empty members
+left to right direction
+
+' ================================================================ app shell
+package "app" {
+  class main <<module>> {
+    + QueryClient
+    ..
+    applyTheme(readTheme()); renders <App/>
+    inside QueryClientProvider
+  }
+  class App <<component>>
+  class AppRoutes <<component>> {
+    - SessionRoutes()
+    ..
+    / -> /login | /disabled | /app
+    /app            -> MainPage
+    /app/settings/* -> SettingsPage
+    /app/bookings   -> BookingsPage
+  }
+  class AppLayout <<component>> {
+    renders <Outlet/>
+  }
+  class theme <<module>> {
+    + readTheme(): Theme
+    + applyTheme(theme: Theme, animate: boolean)
+    + saveTheme(theme: Theme)
+  }
+  enum Theme {
+    dark
+    light
+  }
+}
+
+' ================================================================ pages
+package "pages" {
+  class LoginPage <<page>> {
+    redirects to backend /login
+  }
+  class DisabledPage <<page>>
+  class MainPage <<page>> {
+    - query: string
+    - draft: Item | null
+    - editing: boolean
+    - dirty: boolean
+    - saving: boolean
+    - sidebarOpen: boolean
+    ..
+    - changeQuantity(id, update)
+    - createTagByName(name): Tag | null
+    - updateItemTags(id, ids)
+    - moveCategory(id, parentID)
+    - removeTag(tag)
+    - removeItem(id)
+  }
+  class BookingsPage <<page>> {
+    - view: 'schedule' | 'mine' | 'all'
+    - day: Date
+    - category: string | null
+    - availableNow: boolean
+    ..
+    - saveEquipment(item)
+    - removeEquipment(item)
+  }
+  class SettingsPage <<page>> {
+    routes: index -> AccountSettings
+    users -> UsersSettings (admin)
+    app -> AppSettings (admin)
+  }
+  class AccountPage <<page>> {
+    <i>not routed (unused)</i>
+  }
+}
+
+' ================================================================ shared components
+package "components" {
+  class Workspace <<component>> {
+    + children: ReactNode
+    + onBeforeLeave?: () => boolean | Promise<boolean>
+  }
+  class DetailPanel <<component>> {
+    + label: string
+    + open: boolean
+    + children: ReactNode
+  }
+  class PageHeader <<component>> {
+    + onBeforeLogout?: () => boolean | Promise<boolean>
+  }
+  class PageNavigation <<component>>
+  class ThemeToggle <<component>>
+  class AuthPageShell <<component>> {
+    + children: ReactNode
+    + background?: ReactNode
+  }
+  class ParticlesBG <<component>>
+  class ConfirmProvider <<component>> {
+    + children: ReactNode
+  }
+  class Modal <<component>> {
+    + title: string
+    + children: ReactNode
+    + onClose: () => void
+    + role?: string
+    + describedBy?: string
+    + compact?: boolean
+  }
+  class ErrorBanner <<component>> {
+    + message: string
+    + onDismiss?: () => void
+    + onRetry?: () => void
+    + retrying?: boolean
+  }
+  class SearchInput <<component>> {
+    + value: string
+    + onChange: (value: string) => void
+    + placeholder: string
+    + label: string
+  }
+  class Field <<component>> {
+    + label: string
+    + required?: boolean
+    + className?: string
+    + children: ReactNode
+  }
+  class ListSkeleton <<component>> {
+    + label: string
+    + equipment?: boolean
+  }
+  class styles <<module>> {
+    + INPUT
+    + BUTTON
+    + CARD
+  }
+}
+
+' ================================================================ hooks
+package "hooks" {
+  class ConfirmContext <<context>> {
+    (options: ConfirmOptions) => Promise<boolean>
+  }
+  class ConfirmOptions <<interface>> {
+    + title: string
+    + message: string
+    + confirmLabel?: string
+    + cancelLabel?: string
+    + destructive?: boolean
+  }
+  class useConfirm <<hook>> {
+    + useConfirm(): (options) => Promise<boolean>
+  }
+  class useUnsavedChanges <<hook>> {
+    + useUnsavedChanges(dirty: boolean, saving?: boolean): () => Promise<boolean>
+  }
+}
+
+' ================================================================ features/auth
+package "features.auth" {
+  class AuthState <<interface>> {
+    union of three states:
+    1. loggedIn = false
+    2. loggedIn = true, disabled = true
+    3. loggedIn = true, disabled = false,
+       name, email, permissions: string[]
+  }
+  class authApi <<service>> {
+    + authQueryKey
+    + whoAmI(signal?): Promise<AuthState>
+    + logout(): Promise<void>
+    + hasPermission(auth, permission): boolean
+  }
+  class useAuth <<hook>> {
+    + useAuth(): UseQueryResult<AuthState>
+    + useLogout(): UseMutationResult
+    ..
+    redirects disabled users to /disabled
+  }
+  class permissions <<module>> {
+    + PERMISSIONS: {name, purpose}[]
+  }
+}
+
+' ================================================================ features/items
+package "features.items" {
+  class Item <<interface>> {
+    + id: string
+    + itemName: string
+    + quantity: number
+    + manufacturer: string
+    + manufacturerPart: string
+    + distributorPart: string
+    + distributorURL: string
+    + dataSheetURL: string
+    + description: string
+    + Tags?: Tag[]
+  }
+  class NewItem <<interface>> {
+    + itemName: string
+    + quantity: number
+    + manufacturer: string
+    + manufacturerPart: string
+    + categories?: TagID[]
+    + distributorPart?: string
+    + distributorURL?: string
+    + dataSheetURL?: string
+    + description?: string
+    + logDescription?: string
+  }
+  class UpdateItem <<interface>> {
+    all NewItem fields optional;
+    itemDescription replaces description
+  }
+  class ServerItem <<interface>> {
+    PascalCase shape returned by API
+  }
+  class Tag <<interface>> {
+    + ID: TagID
+    + Name: string
+    + ParentID?: TagID | null
+  }
+  class ServerCategory <<interface>> {
+    + ID: TagID
+    + CategoryName: string
+    + ParentID: TagID | null
+  }
+  class CategoryEntry <<interface>> {
+    + tag: Tag
+    + ancestors: Tag[]
+    + path: string
+  }
+
+  class inventoryRequest <<service>> {
+    + request(path, init, errorPrefix): Promise<Response>
+  }
+  class itemsApi <<service>> {
+    + getItems(): Promise<Item[]>
+    + getItem(id): Promise<Item>
+    + createItem(item: NewItem): Promise<Item>
+    + updateItem(id, changes: UpdateItem): Promise<Item>
+    + adjustItem(id, action: 'ADDED'|'TAKEN', amount, note?): Promise<Item>
+    + deleteItem(id): Promise<void>
+    - fromServer(s: ServerItem): Item
+  }
+  class tagsApi <<service>> {
+    + getTags(): Promise<Tag[]>
+    + createTag(name): Promise<Tag>
+    + moveTag(id, parentID): Promise<void>
+    + deleteTag(id): Promise<void>
+    + normalizeTag(c: ServerCategory): Tag
+  }
+  class useInventoryData <<hook>> {
+    + useInventoryData(email, enabled)
+    ..
+    returns items, tags, loading, loadError,
+    setItems, setTags, retry, ...
+  }
+  class categoryHierarchy <<module>> {
+    + getCategoryHierarchy(tags: Tag[]): Map<TagID, CategoryEntry>
+  }
+  class itemStock <<module>> {
+    + MAX_ITEM_QUANTITY = 2147483647
+    + getStock(item): 'In stock' | 'Low stock' | 'Out of stock'
+    + STOCK_STYLES
+  }
+
+  class ItemDetails <<component>> {
+    + item: Item
+    + isDraft, editing, canModify, canDelete: boolean
+    + saving, adjusting: boolean
+    + error: string
+    + categories: ReactNode
+    + onSave(item: NewItem, categoryIds?)
+    + onAdjust(id, delta)
+    + onSetQuantity(id, quantity): Promise<boolean>
+    + onDelete(id)
+    + onEdit(), onClose(), onCancel()
+  }
+  class ItemForm <<component>> {
+    + item: Item
+    + editing?: boolean
+    + saving: boolean
+    + onDirtyChange(dirty)
+    + onSave(item: NewItem)
+    + onCancel()
+  }
+  class TagSidebar <<component>> {
+    + open: boolean
+    + categories: ReadonlyMap<TagID, CategoryEntry>
+    + counts: Map<TagID, number>
+    + activeIds: TagID[]
+    + canCreateTags, canDeleteTags: boolean
+    + onToggleTag(id), onClearTags()
+    + onCreate(name): Promise<Tag | null>
+    + onMove(id, parentID): Promise<void>
+    + onDelete(tag)
+  }
+  class TagEditor <<component>> {
+    + categories: ReadonlyMap<TagID, CategoryEntry>
+    + selectedIds: TagID[]
+    + canEdit, canCreateTags: boolean
+    + onChange(ids)
+    + onCreate(name): Promise<Tag | null>
+  }
+  class TagChip <<component>> {
+    + tag: Tag
+    + label?: string
+    + onRemove?()
+  }
+}
+
+' ================================================================ features/bookings
+package "features.bookings" {
+  note as BookingsNote
+    <b>Demo only:</b> bookingsApi keeps equipment and
+    bookings in memory. The backend has no
+    /equipment or /bookings endpoints yet.
+  end note
+
+  enum EquipmentStatus {
+    ACTIVE
+    MAINTENANCE
+  }
+  class Equipment <<interface>> {
+    + ID: number
+    + Name: string
+    + Category: string
+    + Location: string
+    + Description: string
+    + Status: EquipmentStatus
+    + MaintenanceNote?: string
+    + OpenHour?: number
+    + CloseHour?: number
+  }
+  class NewEquipment <<interface>> {
+    Omit<Equipment, 'ID'>
+  }
+  class Booking <<interface>> {
+    + ID: number
+    + EquipmentID: number
+    + UserName: string
+    + Mine: boolean
+    + Start: string (ISO 8601)
+    + End: string (ISO 8601)
+    + Purpose: string
+  }
+  class NewBooking <<interface>> {
+    Pick<Booking, EquipmentID, Start, End, Purpose>
+  }
+
+  class bookingsApi <<service>> {
+    + getEquipment(): Promise<Equipment[]>
+    + createEquipment(item, auth): Promise<Equipment>
+    + updateEquipment(id, item, auth): Promise<Equipment>
+    + deleteEquipment(id, auth): Promise<void>
+    + getBookings(): Promise<Booking[]>
+    + createBooking(b: NewBooking): Promise<Booking>
+    + updateBooking(id, b, auth): Promise<Booking>
+    + cancelBooking(id, auth): Promise<void>
+    - requirePermission(auth, permission)
+    - equipmentValues(item): NewEquipment
+  }
+  class bookingTime <<module>> {
+    + OPEN_HOUR = 8
+    + CLOSE_HOUR = 20
+    + MAX_HOURS = 8
+    + SLOT_HOURS = 0.5
+    + equipmentHours(eq): {open, close}
+    + equipmentHoursError(eq): string | null
+    + bookingError(eq, bookings, start, end, now): string | null
+    + freeHours(day, bookings, now, eq)
+    + bookingsForDay(bookings, day)
+    + weekDates(now), bookingWindowEnd(now)
+    + overlaps(aStart, aEnd, bStart, bEnd)
+    + fmtTime, fmtDay, toDateInput, ...
+  }
+  class bookingPermissions <<module>> {
+    + canManageReservation(auth, booking): boolean
+  }
+
+  class BookingSchedule <<component>> {
+    + equipment: Equipment[]
+    + bookings: Map<number, Booking[]>
+    + day, now: Date
+    + selectedId: number | null
+    + onSelect(id, hour?, duration?)
+    + onSelectBooking(booking)
+  }
+  class CategoryIcon <<component>> {
+    + category: string
+  }
+  class BookingFilters <<component>> {
+    + equipment: Equipment[]
+    + category: string | null
+    + availableNow: boolean
+    + onCategory(category)
+    + onAvailableNow()
+  }
+  class BookingPanel <<component>> {
+    + equipment: Equipment
+    + bookings: Booking[]
+    + auth: AuthState
+    + initialBooking?: Booking
+    + onBook(b: NewBooking): Promise<string | null>
+    + onUpdate(id, b): Promise<string | null>
+    + onCancel(id)
+  }
+  class ReservationDetails <<component>> {
+    + equipment: Equipment
+    + booking: Booking
+    + auth: AuthState
+    + onEdit(), onCancel(), onClose()
+  }
+  class EquipmentEditor <<component>> {
+    + equipment: Equipment | null
+    + categories: string[]
+    + readOnly?: boolean
+    + onSave(item: NewEquipment): Promise<string | null>
+    + onDelete?()
+  }
+  class BookingSkeleton <<component>> {
+    + view: 'schedule' | 'mine' | 'all'
+  }
+  class EquipmentList <<component>> {
+    <i>not rendered (unused)</i>
+    + equipment: Equipment[]
+    + onEdit(item), onDelete?(item)
+  }
+}
+
+' ================================================================ features/settings
+package "features.settings" {
+  class ManagedUser <<interface>> {
+    + id: string
+    + name: string
+    + email: string
+    + disabled: boolean
+    + permissions: string[]
+  }
+  class AppSettingsValues <<interface>> {
+    Record<string, string>
+  }
+  class settingsApi <<service>> {
+    + getUsers(signal?): Promise<ManagedUser[]>
+    + putUserPermissions(id, permissions): Promise<void>
+    + setUserDisabled(id, disabled): Promise<void>
+    + getSettings(signal?): Promise<AppSettings>
+    + patchSettings(values): Promise<void>
+    + createSetting(name, value) <i>(unused)</i>
+    - request<T>(path, options): Promise<T>
+  }
+  class AccountSettings <<component>>
+  class UsersSettings <<component>> {
+    + currentEmail: string
+    - UserEditor(user, currentEmail, onClose)
+  }
+  class AppSettings <<component>> {
+    - SettingEditor(name, value)
+    - SettingField(name, value, onChange)
+  }
+  class EmailDomainList <<component>> {
+    + id: string
+    + value: string
+    + onChange(value)
+  }
+}
+
+' ================================================================ relationships
+
+' --- app shell and routing
+main *-- App
+App *-- ConfirmProvider
+ConfirmProvider *-- AppRoutes
+ConfirmProvider *-- Modal
+ConfirmProvider ..> ConfirmContext : provides
+AppRoutes ..> useAuth
+AppRoutes *-- LoginPage
+AppRoutes *-- DisabledPage
+AppRoutes *-- AppLayout
+AppRoutes *-- AuthPageShell
+AppLayout *-- MainPage
+AppLayout *-- BookingsPage
+AppLayout *-- SettingsPage
+theme --> Theme
+ThemeToggle ..> theme
+
+' --- shared layout
+LoginPage *-- AuthPageShell
+LoginPage *-- ParticlesBG
+DisabledPage *-- AuthPageShell
+DisabledPage *-- ThemeToggle
+DisabledPage ..> useAuth : useLogout
+Workspace *-- PageHeader
+PageHeader *-- PageNavigation
+PageHeader *-- ThemeToggle
+PageHeader *-- ErrorBanner
+PageHeader ..> useAuth : useLogout
+
+' --- hooks
+useConfirm ..> ConfirmContext
+useConfirm ..> ConfirmOptions
+useUnsavedChanges ..> useConfirm
+
+' --- auth
+useAuth ..> authApi
+authApi ..> AuthState
+bookingPermissions ..> authApi : hasPermission
+
+' --- MainPage (inventory)
+MainPage *-- Workspace
+MainPage *-- DetailPanel
+MainPage *-- SearchInput
+MainPage *-- ErrorBanner
+MainPage *-- ListSkeleton
+MainPage *-- TagSidebar
+MainPage *-- ItemDetails
+MainPage *-- TagEditor
+MainPage *-- TagChip
+MainPage ..> useAuth
+MainPage ..> useInventoryData
+MainPage ..> useUnsavedChanges
+MainPage ..> useConfirm
+MainPage ..> itemsApi
+MainPage ..> tagsApi
+MainPage ..> categoryHierarchy
+MainPage ..> itemStock
+
+ItemDetails *-- ItemForm
+ItemDetails *-- ErrorBanner
+ItemDetails ..> itemStock
+ItemForm *-- Field
+TagEditor *-- TagChip
+
+useInventoryData ..> itemsApi
+useInventoryData ..> tagsApi
+itemsApi ..> inventoryRequest
+tagsApi ..> inventoryRequest
+itemsApi ..> Item
+itemsApi ..> NewItem
+itemsApi ..> UpdateItem
+itemsApi ..> ServerItem
+tagsApi ..> ServerCategory
+Item "1" o-- "0..*" Tag : Tags
+Tag "0..*" --> "0..1" Tag : ParentID
+CategoryEntry --> Tag
+categoryHierarchy ..> CategoryEntry
+
+' --- BookingsPage
+BookingsPage *-- Workspace
+BookingsPage *-- DetailPanel
+BookingsPage *-- SearchInput
+BookingsPage *-- ErrorBanner
+BookingsPage *-- BookingSkeleton
+BookingsPage *-- BookingSchedule
+BookingsPage *-- BookingFilters
+BookingsPage *-- BookingPanel
+BookingsPage *-- ReservationDetails
+BookingsPage *-- EquipmentEditor
+BookingsPage ..> useAuth
+BookingsPage ..> useConfirm
+BookingsPage ..> bookingsApi
+BookingsPage ..> bookingPermissions
+
+BookingSchedule *-- CategoryIcon
+BookingFilters *-- CategoryIcon
+BookingPanel *-- Field
+BookingPanel *-- ErrorBanner
+BookingPanel ..> bookingTime
+BookingPanel ..> bookingPermissions
+ReservationDetails *-- ErrorBanner
+ReservationDetails ..> bookingPermissions
+EquipmentEditor *-- Field
+EquipmentEditor ..> bookingTime
+BookingSchedule ..> bookingTime
+
+bookingsApi ..> bookingTime
+bookingsApi ..> bookingPermissions
+bookingsApi .. BookingsNote
+Equipment --> EquipmentStatus
+Booking "0..*" --> "1" Equipment : EquipmentID
+NewEquipment ..> Equipment : <<derive>>
+NewBooking ..> Booking : <<derive>>
+bookingsApi ..> Equipment
+bookingsApi ..> Booking
+
+' --- SettingsPage
+SettingsPage *-- PageHeader
+SettingsPage *-- AccountSettings
+SettingsPage *-- UsersSettings
+SettingsPage *-- AppSettings
+SettingsPage ..> useAuth
+AccountSettings ..> useAuth
+UsersSettings *-- DetailPanel
+UsersSettings *-- SearchInput
+UsersSettings *-- ListSkeleton
+UsersSettings ..> useConfirm
+UsersSettings ..> settingsApi
+UsersSettings ..> permissions
+AppSettings *-- EmailDomainList
+AppSettings *-- ListSkeleton
+AppSettings ..> settingsApi
+settingsApi ..> ManagedUser
+settingsApi ..> AppSettingsValues
+
+@enduml
