@@ -11,6 +11,7 @@ Live deployment: https://inventory.evaan.dev
 | `backend/` | Go API (Gin and GORM) with the auth, inventory, category and settings endpoints, plus Go tests in `backend/tests/` |
 | `frontend/` | React and TypeScript single-page app (Vite, Tailwind, TanStack Query) with Vitest tests next to the code |
 | `compose.yml` | Production stack: Traefik, a Docker socket proxy, the frontend, the backend and PostgreSQL |
+| `compose.dev.yml` | Development stack with Vite hot reload, Air for the Go backend and an isolated PostgreSQL database |
 | `justfile` | `just dev` starts the backend and frontend in development mode |
 | `.github/workflows/` | CI (build, test, lint, format and Swagger checks, then auto-merge) and Deliver (publish images, deploy to production) |
 | `docs/` | User guide, maintenance guide and operations guide |
@@ -20,7 +21,7 @@ Live deployment: https://inventory.evaan.dev
 
 - Docker with the Compose plugin (to run the full system)
 - A Google OAuth client ID and secret (Google Cloud Console → APIs & Services → Credentials)
-- For development only: Go (the version in `backend/go.mod`), Bun 1.x, PostgreSQL, and optionally `just`, `tmux` and `air`
+- For development without Docker: Go (the version in `backend/go.mod`), Bun 1.x, PostgreSQL, and optionally `just`, `tmux` and `air`
 
 ## Run the full system from a clean checkout
 
@@ -40,6 +41,24 @@ Open http://localhost:8381. The redirect URL above must also be added to the OAu
 The first person to sign in with the email in `ADMIN_EMAIL` becomes the administrator. By default only `@mun.ca` addresses can sign up. The administrator can change this in **Settings → App settings**.
 
 ## Development
+
+### Docker
+
+```bash
+cp .env.example .env
+# Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and ADMIN_EMAIL.
+docker compose -f compose.dev.yml up --build
+```
+
+Open http://localhost:5173. Add `http://localhost:5173/api/callback` to the Google OAuth client's authorised redirect URIs. The dev stack sets local callback and frontend URLs independently of any production URLs in `.env`. Both frontend and backend have hot reload for this environment.
+
+```bash
+docker compose -f compose.dev.yml down
+# After changing frontend dependencies, rebuild and refresh container node_modules:
+docker compose -f compose.dev.yml up --build --renew-anon-volumes
+```
+
+### Without Docker
 
 ```bash
 cp backend/.env.example backend/.env      # fill in values and a local POSTGRES_URL
