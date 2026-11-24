@@ -3,10 +3,10 @@ package inventory
 import (
 	"errors"
 	"net/http"
-	"uuid"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"gitlab.com/evaandev/unnamed-inventory-manager/email"
+	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
 	"gopkg.in/gomail.v2"
 	"gorm.io/gorm"
 )
@@ -18,8 +18,14 @@ import (
 // @Param			id		path	string				true	"Item ID"	Format(uuid)
 // @Success		200		"Item updated (returns object)"
 // @Failure		500		"Failed to retrieve item, "
-// @Router			/items/{id} [put]
+// @Router			/requests/{id} [put]
 func UpdateRequest(c *gin.Context, db *gorm.DB, eDialer *gomail.Dialer) {
+	user, err := auth.GetUser(c)
+	if err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
 	id := c.Param("id")
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -27,7 +33,19 @@ func UpdateRequest(c *gin.Context, db *gorm.DB, eDialer *gomail.Dialer) {
 		})
 		return
 	}
-	itemid, err := uuid.Parse(id)
+
+	isAdmin, err := auth.IsAdmin(db.WithContext(c.Request.Context()), user)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	if !isAdmin {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	requestId, err := strconv.Atoi(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid item ID",
@@ -36,7 +54,7 @@ func UpdateRequest(c *gin.Context, db *gorm.DB, eDialer *gomail.Dialer) {
 	}
 
 	var itemRequest Request
-	if err := db.First(&itemRequest, "id = ?", itemid).Error; err != nil {
+	if err := db.First(&itemRequest, "id = ?", requestId).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Item not found",
@@ -59,9 +77,8 @@ func UpdateRequest(c *gin.Context, db *gorm.DB, eDialer *gomail.Dialer) {
 	}
 
 	var deltaQ int32
-	if itemRequest.ProposedQuantity == nil {
-		deltaQ = itemRequest.OldQuantity
-	} else {
+	deltaQ = 0
+	if itemRequest.ProposedQuantity != nil {
 		deltaQ = *itemRequest.ProposedQuantity - itemRequest.OldQuantity
 	}
 
@@ -79,16 +96,18 @@ func UpdateRequest(c *gin.Context, db *gorm.DB, eDialer *gomail.Dialer) {
 	newRequest := itemRequest
 	if !req.ChangeAuthorized {
 		newRequest.Approved = RequestDenied
-		// TODO: set real values
-		email.SendEmail(eDialer, "aw", "", "", "Your request for this item has been denied", "")
+
+		// send email to user
+		// email.SendEmail(eDialer, "aw", "", "", "Your request for this item has been denied", "")
 	} else {
 		// request set as approved
 		// change is done to item
-		// email is sent to user
 		// change log is updated
 		newRequest.Approved = RequestApproved
 		ModifyItem(c, db, itemRequest.UserID, itemRequest.Item, newItem, deltaQ, itemRequest.Action, itemRequest.Description)
-		email.SendEmail(eDialer, "aw", "", "", "Your request for this item has been approved", "")
+
+		// email is sent to user
+		// email.SendEmail(eDialer, "aw", "", "", "Your request for this item has been approved", "")
 	}
 
 	if err := db.Model(&itemRequest).Updates(newRequest).Error; err != nil {

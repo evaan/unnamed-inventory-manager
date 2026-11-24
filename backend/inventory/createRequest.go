@@ -7,12 +7,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gitlab.com/evaandev/unnamed-inventory-manager/auth"
-	"gitlab.com/evaandev/unnamed-inventory-manager/email"
 	"gopkg.in/gomail.v2"
 	"gorm.io/gorm"
 )
 
-func CreateRequest(c *gin.Context, user *auth.User, item Item, req UpdateItemReq, deltaQ int32, action ChangelogAction, logDescription string, db *gorm.DB, eDialer *gomail.Dialer) {
+func CreateRequest(c *gin.Context, user *auth.User, item Item, req UpdateItemReq, deltaQ int32, action ChangelogAction, db *gorm.DB, eDialer *gomail.Dialer) {
 	// add request to request table
 	itemRequest := Request{
 		UserID:                   uuid.UUID(user.ID),
@@ -28,7 +27,7 @@ func CreateRequest(c *gin.Context, user *auth.User, item Item, req UpdateItemReq
 		ProposedItemDescription:  req.ItemDescription,
 		ChangeTime:               time.Now(),
 		Approved:                 RequestPending,
-		Description:              logDescription,
+		Description:              req.LogDescription,
 	}
 
 	if err := db.Create(&itemRequest).Error; err != nil {
@@ -42,6 +41,5 @@ func CreateRequest(c *gin.Context, user *auth.User, item Item, req UpdateItemReq
 	})
 
 	// send email to admin
-	// TODO add real values
-	email.SendEmail(eDialer, "aw", "", "", "Please answer to this request of this person to this item", "")
+	// email.SendEmail(eDialer, "aw", "", "", "Please answer to this request of this person to this item", "")
 }

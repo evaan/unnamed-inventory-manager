@@ -95,9 +95,14 @@ func UpdateItem(c *gin.Context, db *gorm.DB, eDialer *gomail.Dialer) {
 		return
 	}
 
-	// TODO: check current user is not admin
-	if item.NeedRequest {
-		CreateRequest(c, user, item, req, deltaQ, action, *req.LogDescription, db, eDialer)
+	isAdmin, err := auth.IsAdmin(db.WithContext(c.Request.Context()), user)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	if item.NeedRequest && !isAdmin {
+		CreateRequest(c, user, item, req, deltaQ, action, db, eDialer)
 		return
 	}
 

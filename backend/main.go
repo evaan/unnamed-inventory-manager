@@ -7,10 +7,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"gitlab.com/evaandev/unnamed-inventory-manager/database"
-	"gitlab.com/evaandev/unnamed-inventory-manager/email"
 	"gitlab.com/evaandev/unnamed-inventory-manager/routes"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"gopkg.in/gomail.v2"
 )
 
 // @title			Unnamed Inventory Manager API
@@ -66,8 +66,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// TODO add real values
-	eDialer := email.CreateEmailDialer("", 1, "", "")
+	// eDialer := email.CreateEmailDialer("", 1, "", "")
+	var eDialer *gomail.Dialer
+	eDialer = nil
 
 	if err := routes.Register(router, db, oauthCfg, eDialer, frontendURL); err != nil {
 		log.Fatal(err)
