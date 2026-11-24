@@ -1,0 +1,61 @@
+name: inventory-dev
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    init: true
+    ports:
+      - "127.0.0.1:5173:5173"
+    environment:
+      VITE_API_URL: /api
+      API_PROXY_TARGET: http://backend:8080
+      VITE_USE_POLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    init: true
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      GIN_MODE: debug
+      POSTGRES_URL: postgresql://admin:${POSTGRES_PASSWORD:-inventory-dev}@postgres:5432/inventory?sslmode=disable
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in .env}
+      GOOGLE_REDIRECT_URL: http://localhost:5173/api/callback
+      FRONTEND_URL: http://localhost:5173/app
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    volumes:
+      - ./backend:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:19-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-inventory-dev}
+      POSTGRES_DB: inventory
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d inventory"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+  go-mod-cache:
+  go-build-cache:
