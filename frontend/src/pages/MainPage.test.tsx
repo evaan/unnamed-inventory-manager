@@ -32,6 +32,7 @@ const makeItem = (overrides: Partial<Item> = {}): Item => ({
   id: '1',
   itemName: 'Resistor 4.7k',
   quantity: 50,
+  lowStockThreshold: 10,
   manufacturer: 'Yageo',
   manufacturerPart: 'RC0805-4K7',
   distributorPart: 'DK-4K7',
@@ -111,7 +112,7 @@ describe('MainPage: loading and listing', () => {
     expect(screen.queryByRole('status', { name: 'Loading items' })).not.toBeInTheDocument();
   });
 
-  it('derives stock status from quantity (>10, 1-10, 0)', async () => {
+  it('derives stock status using the default threshold of 10', async () => {
     await renderPage();
     expect(screen.getByText('In stock')).toBeInTheDocument();
     expect(screen.getByText('Low stock')).toBeInTheDocument();
@@ -373,7 +374,7 @@ describe('MainPage: new item', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Quantity must be a whole number');
   });
 
-  it('saves trimmed values, an integer quantity, and selected categories with the new item', async () => {
+  it('saves trimmed values, quantity, threshold, and selected categories with the new item', async () => {
     vi.mocked(useAuth).mockReturnValue({
       data: { loggedIn: true, disabled: false, permissions: ['CreateItem', 'ModifyItem'] },
     } as never);
@@ -386,6 +387,9 @@ describe('MainPage: new item', () => {
     await userEvent.type(screen.getByLabelText('Name'), '  Inductor  ');
     await userEvent.clear(screen.getByLabelText('Quantity'));
     await userEvent.type(screen.getByLabelText('Quantity'), '12');
+    expect(screen.getByLabelText('Low stock threshold')).toHaveValue(10);
+    await userEvent.clear(screen.getByLabelText('Low stock threshold'));
+    await userEvent.type(screen.getByLabelText('Low stock threshold'), '25');
     await userEvent.type(screen.getByLabelText('Manufacturer'), ' TDK ');
     await userEvent.type(screen.getByLabelText('Manufacturer Part #'), ' TDK-12 ');
     await userEvent.type(screen.getByPlaceholderText('Add a category…'), 'Passives');
@@ -393,7 +397,7 @@ describe('MainPage: new item', () => {
     await userEvent.click(screen.getByRole('button', { name: /add item/i }));
 
     expect(createItem).toHaveBeenCalledWith(
-      expect.objectContaining({ itemName: 'Inductor', quantity: 12, manufacturer: 'TDK', manufacturerPart: 'TDK-12', categories: [tag.ID] })
+      expect.objectContaining({ itemName: 'Inductor', quantity: 12, lowStockThreshold: 25, manufacturer: 'TDK', manufacturerPart: 'TDK-12', categories: [tag.ID] })
     );
     expect(updateItem).not.toHaveBeenCalled();
     expect(await screen.findByRole('heading', { name: 'Inductor' })).toBeInTheDocument();
@@ -420,26 +424,32 @@ describe('MainPage: editing item details', () => {
     vi.mocked(useAuth).mockReturnValue({ data: { loggedIn: true, disabled: false, permissions: ['ModifyItem'] } } as never);
   });
 
-  it('prefills details and saves metadata without overwriting quantity', async () => {
-    vi.mocked(updateItem).mockResolvedValue(makeItem({ itemName: 'Precision resistor', description: 'Updated description', quantity: 60 }));
-    await renderPage();
+  it('prefills and saves metadata and threshold without overwriting quantity', async () => {
+    vi.mocked(updateItem).mockResolvedValue(makeItem({ itemName: 'Precision resistor', description: 'Updated description', quantity: 60, lowStockThreshold: 75 }));
+    await renderPage([ITEMS[0]]);
     await userEvent.click(screen.getByRole('button', { name: /resistor 4\.7k/i }));
     await userEvent.click(screen.getByRole('button', { name: 'Edit item' }));
     expect(screen.getByLabelText('Name')).toHaveValue('Resistor 4.7k');
-    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+    expect(screen.queryByRole('spinbutton', { name: 'Quantity' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Low stock threshold')).toHaveValue(10);
+    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveFocus());
+    await userEvent.clear(screen.getByLabelText('Low stock threshold'));
+    await userEvent.type(screen.getByLabelText('Low stock threshold'), '75');
     await userEvent.clear(screen.getByLabelText('Name'));
     await userEvent.type(screen.getByLabelText('Name'), ' Precision resistor ');
     await userEvent.clear(screen.getByLabelText('Description'));
     await userEvent.type(screen.getByLabelText('Description'), 'Updated description');
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(updateItem).toHaveBeenCalledWith('1', expect.objectContaining({
-      itemName: 'Precision resistor', itemDescription: 'Updated description',
+      itemName: 'Precision resistor', itemDescription: 'Updated description', lowStockThreshold: 75,
     }));
     expect(vi.mocked(updateItem).mock.calls[0][1]).not.toHaveProperty('quantity');
     expect(vi.mocked(updateItem).mock.calls[0][1]).not.toHaveProperty('description');
     expect(vi.mocked(updateItem).mock.calls[0][1]).not.toHaveProperty('categories');
     expect(await screen.findByRole('heading', { name: 'Precision resistor' })).toBeInTheDocument();
     expect(screen.getByLabelText('Quantity: 60', { selector: 'span' })).toBeVisible();
+    expect(screen.getAllByText('Low stock')).toHaveLength(2);
+    expect(screen.queryByText('In stock')).not.toBeInTheDocument();
   });
 
   it('keeps category changes in the edit form until saved', async () => {

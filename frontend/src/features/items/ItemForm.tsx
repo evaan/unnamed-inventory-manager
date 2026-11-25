@@ -8,6 +8,7 @@ type Draft = Record<Exclude<keyof NewItem, 'categories' | 'logDescription'>, str
 const toDraft = (item: Item): Draft => ({
   itemName: item.itemName,
   quantity: String(item.quantity),
+  lowStockThreshold: String(item.lowStockThreshold),
   manufacturer: item.manufacturer,
   manufacturerPart: item.manufacturerPart,
   distributorPart: item.distributorPart ?? '',
@@ -38,6 +39,7 @@ export const ItemForm = ({ item, editing = false, saving, onDirtyChange, onSave,
   const [draft, setDraft] = useState(initial);
   const [error, setError] = useState('');
   const errorId = useId();
+  const thresholdHelpId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const dirty = Object.keys(initial).some((key) => draft[key as keyof Draft] !== initial[key as keyof Draft]);
 
@@ -64,6 +66,11 @@ export const ItemForm = ({ item, editing = false, saving, onDirtyChange, onSave,
       setError('Quantity must be a whole number between 0 and 2,147,483,647.');
       return;
     }
+    const lowStockThreshold = Number(draft.lowStockThreshold);
+    if (!draft.lowStockThreshold.trim() || !Number.isInteger(lowStockThreshold) || lowStockThreshold < 0 || lowStockThreshold > MAX_ITEM_QUANTITY) {
+      setError('Low stock threshold must be a whole number between 0 and 2,147,483,647.');
+      return;
+    }
     if (!isWebURL(draft.distributorURL) || !isWebURL(draft.dataSheetURL)) {
       setError('Enter a valid http:// or https:// URL.');
       return;
@@ -74,6 +81,7 @@ export const ItemForm = ({ item, editing = false, saving, onDirtyChange, onSave,
       manufacturer: draft.manufacturer.trim(),
       manufacturerPart: draft.manufacturerPart.trim(),
       quantity,
+      lowStockThreshold,
     });
   };
 
@@ -90,6 +98,12 @@ export const ItemForm = ({ item, editing = false, saving, onDirtyChange, onSave,
               <input type="number" inputMode="numeric" min={0} max={MAX_ITEM_QUANTITY} step={1} required value={draft.quantity} onChange={(e) => set('quantity', e.target.value)} className={INPUT} />
             </Field>
           )}
+          <div>
+            <Field label="Low stock threshold" required>
+              <input type="number" inputMode="numeric" min={0} max={MAX_ITEM_QUANTITY} step={1} required aria-describedby={thresholdHelpId} value={draft.lowStockThreshold} onChange={(e) => set('lowStockThreshold', e.target.value)} className={INPUT} />
+            </Field>
+            <p id={thresholdHelpId} className="mt-1 text-xs text-slate-500">Low stock at or below this quantity. Set to 0 to only flag out-of-stock items.</p>
+          </div>
           <Field label="Manufacturer" required>
             <input required value={draft.manufacturer} onChange={(e) => set('manufacturer', e.target.value)} className={INPUT} />
           </Field>

@@ -36,6 +36,7 @@ const BLANK_ITEM: Item = {
   id: DRAFT_ID,
   itemName: '',
   quantity: 0,
+  lowStockThreshold: 10,
   manufacturer: '',
   manufacturerPart: '',
   distributorPart: '',
@@ -156,6 +157,7 @@ export const MainPage = () => {
       // Omit quantity: editing metadata must not overwrite stock changed elsewhere.
       const updated = await updateItem(selectedId, {
         itemName: values.itemName,
+        lowStockThreshold: values.lowStockThreshold,
         manufacturer: values.manufacturer,
         manufacturerPart: values.manufacturerPart,
         distributorPart: values.distributorPart,

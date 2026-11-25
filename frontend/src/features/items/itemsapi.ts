@@ -6,6 +6,7 @@ interface ServerItem {
   ID: string; // uuid
   ItemName: string;
   Quantity: number;
+  LowStockThreshold?: number;
   Manufacturer: string;
   ManufacturerPart: string;
   DistributorPart: string;
@@ -20,6 +21,7 @@ export interface Item {
   id: string;
   itemName: string;
   quantity: number;
+  lowStockThreshold: number;
   manufacturer: string;
   manufacturerPart: string;
   distributorPart: string;
@@ -33,6 +35,7 @@ const fromServer = (s: ServerItem): Item => ({
   id: s.ID,
   itemName: s.ItemName,
   quantity: s.Quantity,
+  lowStockThreshold: s.LowStockThreshold ?? 10,
   manufacturer: s.Manufacturer,
   manufacturerPart: s.ManufacturerPart,
   distributorPart: s.DistributorPart,
@@ -47,6 +50,7 @@ const fromServer = (s: ServerItem): Item => ({
 export interface NewItem {
   itemName: string;
   quantity: number;
+  lowStockThreshold?: number;
   manufacturer: string;
   manufacturerPart: string;
   categories?: TagID[];
@@ -62,6 +66,7 @@ export interface NewItem {
 export interface UpdateItem {
   itemName?: string;
   quantity?: number;
+  lowStockThreshold?: number;
   manufacturer?: string;
   manufacturerPart?: string;
   categories?: TagID[];

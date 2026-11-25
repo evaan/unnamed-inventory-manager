@@ -46,15 +46,16 @@ func AddItem(c *gin.Context, db *gorm.DB) {
 	}
 
 	newItem := Item{
-		ID:               uuid.New(),
-		ItemName:         req.ItemName,
-		Quantity:         *req.Quantity,
-		Manufacturer:     req.Manufacturer,
-		ManufacturerPart: req.ManufacturerPart,
-		DistributorPart:  req.DistributorPart,
-		DistributorURL:   req.DistributorURL,
-		DataSheetURL:     req.DataSheetURL,
-		Description:      req.Description}
+		ID:                uuid.New(),
+		ItemName:          req.ItemName,
+		Quantity:          *req.Quantity,
+		LowStockThreshold: req.LowStockThreshold,
+		Manufacturer:      req.Manufacturer,
+		ManufacturerPart:  req.ManufacturerPart,
+		DistributorPart:   req.DistributorPart,
+		DistributorURL:    req.DistributorURL,
+		DataSheetURL:      req.DataSheetURL,
+		Description:       req.Description}
 
 	if req.Categories != nil {
 
