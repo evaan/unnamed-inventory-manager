@@ -59,6 +59,7 @@ services:
         condition: service_healthy
     environment:
       GIN_MODE: release
+      TZ: ${TZ:-America/St_Johns}
       POSTGRES_URL: postgresql://admin:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/inventory?sslmode=disable
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in .env}

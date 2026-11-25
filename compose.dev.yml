@@ -27,6 +27,7 @@ services:
       - "127.0.0.1:8080:8080"
     environment:
       GIN_MODE: debug
+      TZ: ${TZ:-America/St_Johns}
       POSTGRES_URL: postgresql://admin:${POSTGRES_PASSWORD:-inventory-dev}@postgres:5432/inventory?sslmode=disable
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in .env}
