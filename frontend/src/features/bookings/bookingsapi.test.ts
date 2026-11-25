@@ -1,100 +1,106 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthState } from '../auth/auth';
-import type { NewEquipment } from './bookingsapi';
+import * as api from './bookingsapi';
+import type { Booking, Equipment, NewEquipment } from './bookingsapi';
 
-let api: typeof import('./bookingsapi');
 const auth = (...permissions: string[]): AuthState => ({
   loggedIn: true, disabled: false, name: 'Taylor', email: 'taylor@example.com', permissions,
 });
-const draft: NewEquipment = { Name: ' Test printer ', Category: '3D printers', Location: ' Bench ', Description: '', Status: 'ACTIVE' };
-// Advance demo latency without real-time delays; handle rejection immediately.
-const complete = async <T,>(promise: Promise<T>): Promise<T> => {
-  const result = promise.then((value) => ({ value }), (error: unknown) => ({ error }));
-  await vi.runAllTimersAsync();
-  const settled = await result;
-  if ('error' in settled) throw settled.error;
-  return settled.value;
-};
-const slot = (hour: number) => {
-  const start = new Date(2026, 10, 17, hour);
-  return { Start: start.toISOString(), End: new Date(start.getTime() + 3600_000).toISOString(), Purpose: 'Test' };
+const draft: NewEquipment = { Name: 'Test printer', Category: '3D printers', Location: 'Bench', Description: '', Status: 'ACTIVE' };
+const equipment: Equipment = { ID: 7, ...draft, MaintenanceNote: '', OpenHour: 0, CloseHour: 24 };
+const booking: Booking = {
+  ID: 3, EquipmentID: 7, UserName: 'Taylor', Mine: true,
+  Start: '2026-11-17T10:00:00Z', End: '2026-11-17T11:00:00Z', Purpose: 'Test',
 };
 
-beforeEach(async () => {
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date(2026, 10, 16, 12));
-  vi.resetModules();
-  api = await import('./bookingsapi');
+const fetchMock = vi.fn<typeof fetch>();
+const respond = (status: number, body?: unknown) =>
+  fetchMock.mockResolvedValueOnce(new Response(body === undefined ? null : JSON.stringify(body), { status }));
+const lastCall = () => {
+  const [url, init] = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+  return { url: String(url), method: init?.method, body: init?.body ? JSON.parse(String(init.body)) : undefined, init };
+};
+
+beforeEach(() => {
+  fetchMock.mockReset();
+  vi.stubGlobal('fetch', fetchMock);
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => vi.unstubAllGlobals());
 
-describe('demo equipment API permissions', () => {
-  it('rejects unauthorized equipment mutations', async () => {
-    const session = auth();
-    await expect(complete(api.createEquipment(draft, session))).rejects.toThrow('permission');
-    await expect(complete(api.updateEquipment(1, draft, session))).rejects.toThrow('permission');
-    await expect(complete(api.deleteEquipment(1, session))).rejects.toThrow('permission');
+describe('equipment API', () => {
+  it('loads equipment and treats a null list as empty', async () => {
+    respond(200, { equipment: [equipment] });
+    expect(await api.getEquipment()).toEqual([equipment]);
+    expect(lastCall()).toMatchObject({ method: 'GET', init: { credentials: 'include' } });
+    expect(lastCall().url).toMatch(/\/equipment$/);
+
+    respond(200, { equipment: null });
+    expect(await api.getEquipment()).toEqual([]);
   });
 
-  it('keeps add, modify, and delete grants independent', async () => {
-    const item = await complete(api.createEquipment(draft, auth('BookingAdd')));
-    expect(item).toMatchObject({ Name: 'Test printer', Location: 'Bench' });
-    await expect(complete(api.updateEquipment(item.ID, draft, auth('BookingAdd')))).rejects.toThrow('permission');
-    await expect(complete(api.deleteEquipment(item.ID, auth('BookingModify')))).rejects.toThrow('permission');
-    await expect(complete(api.createEquipment(draft, auth('BookingDelete')))).rejects.toThrow('permission');
-    const updated = await complete(api.updateEquipment(item.ID, { ...draft, Name: 'Updated' }, auth('BookingModify')));
-    expect(updated.Name).toBe('Updated');
-    await complete(api.deleteEquipment(item.ID, auth('BookingDelete')));
-    expect(await complete(api.getEquipment())).not.toContainEqual(expect.objectContaining({ ID: item.ID }));
+  it('creates, updates and deletes equipment with the matching permission', async () => {
+    respond(201, { equipment });
+    expect(await api.createEquipment(draft, auth('BookingAdd'))).toEqual(equipment);
+    expect(lastCall()).toMatchObject({ method: 'POST', body: draft });
+
+    respond(200, { equipment: { ...equipment, Name: 'Updated' } });
+    expect((await api.updateEquipment(7, { ...draft, Name: 'Updated' }, auth('BookingModify'))).Name).toBe('Updated');
+    expect(lastCall()).toMatchObject({ method: 'PUT', body: { Name: 'Updated' } });
+    expect(lastCall().url).toMatch(/\/equipment\/7$/);
+
+    respond(204);
+    await api.deleteEquipment(7, auth('BookingDelete'));
+    expect(lastCall()).toMatchObject({ method: 'DELETE' });
+    expect(lastCall().url).toMatch(/\/equipment\/7$/);
   });
 
-  it('allows Administrator to do all operations and cascades equipment deletion', async () => {
-    const admin = auth('Administrator');
-    const item = await complete(api.createEquipment(draft, admin));
-    const booking = await complete(api.createBooking({ EquipmentID: item.ID, ...slot(10) }));
-    await complete(api.updateEquipment(item.ID, { ...draft, Status: 'MAINTENANCE' }, admin));
-    await complete(api.deleteEquipment(item.ID, admin));
-    expect(await complete(api.getBookings())).not.toContainEqual(expect.objectContaining({ ID: booking.ID }));
-  });
-  it('saves custom working hours on create and update', async () => {
-    const custom = await complete(api.createEquipment({ ...draft, OpenHour: 10, CloseHour: 14 }, auth('BookingAdd')));
-    expect(custom).toMatchObject({ OpenHour: 10, CloseHour: 14 });
-    await expect(complete(api.createBooking({ EquipmentID: custom.ID, ...slot(9) }))).rejects.toThrow(/between 10:00 and 14:00/);
-    const updated = await complete(api.updateEquipment(custom.ID, { ...custom, OpenHour: 12, CloseHour: 24 }, auth('BookingModify')));
-    expect(updated).toMatchObject({ OpenHour: 12, CloseHour: 24 });
-    expect(await complete(api.getEquipment())).toContainEqual(updated);
-    await complete(api.createBooking({ EquipmentID: custom.ID, ...slot(12) }));
+  it('rejects equipment changes without the permission before calling the server', async () => {
+    await expect(api.createEquipment(draft, auth('BookingModify'))).rejects.toThrow('permission');
+    await expect(api.updateEquipment(7, draft, auth('BookingAdd'))).rejects.toThrow('permission');
+    await expect(api.deleteEquipment(7, auth('BookingModify'))).rejects.toThrow('permission');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a closing time before opening without changing equipment', async () => {
-    const hours = { OpenHour: 20, CloseHour: 8 };
-    const before = await complete(api.getEquipment());
-    await expect(complete(api.createEquipment({ ...draft, ...hours }, auth('BookingAdd')))).rejects.toThrow('Working hours');
-    await expect(complete(api.updateEquipment(1, { ...draft, ...hours }, auth('BookingModify')))).rejects.toThrow('Working hours');
-    expect(await complete(api.getEquipment())).toEqual(before);
+  it('lets Administrator manage equipment', async () => {
+    respond(201, { equipment });
+    await api.createEquipment(draft, auth('Administrator'));
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 });
 
-describe('demo reservation ownership', () => {
-  it('edits an own booking without colliding with itself and retains its ID and owner', async () => {
-    const item = await complete(api.createEquipment(draft, auth('BookingAdd')));
-    const booking = await complete(api.createBooking({ EquipmentID: item.ID, ...slot(10) }));
-    const updated = await complete(api.updateBooking(booking.ID, { EquipmentID: item.ID, ...slot(10), Purpose: 'Revised' }, auth()));
-    expect(updated).toEqual({ ...booking, Purpose: 'Revised' });
-    await complete(api.cancelBooking(booking.ID, auth()));
-    expect(await complete(api.getBookings())).not.toContainEqual(expect.objectContaining({ ID: booking.ID }));
+describe('bookings API', () => {
+  it('loads bookings and treats a null list as empty', async () => {
+    respond(200, { bookings: [booking] });
+    expect(await api.getBookings()).toEqual([booking]);
+    expect(lastCall().url).toMatch(/\/bookings$/);
+
+    respond(200, { bookings: null });
+    expect(await api.getBookings()).toEqual([]);
   });
 
-  it('allows reservation managers, but not equipment managers, to manage other people’s bookings', async () => {
-    const booking = (await complete(api.getBookings())).find((entry) => !entry.Mine && new Date(entry.Start) > new Date() && entry.EquipmentID <= 3)!;
-    expect(booking).toBeDefined();
-    const payload = { EquipmentID: booking.EquipmentID, Start: booking.Start, End: booking.End, Purpose: 'Admin revision' };
-    const equipmentManager = auth('BookingAdd', 'BookingModify', 'BookingDelete');
-    await expect(complete(api.updateBooking(booking.ID, payload, equipmentManager))).rejects.toThrow('own bookings');
-    await expect(complete(api.cancelBooking(booking.ID, equipmentManager))).rejects.toThrow('own bookings');
-    const updated = await complete(api.updateBooking(booking.ID, payload, auth('BookingManage')));
-    expect(updated).toMatchObject({ ID: booking.ID, Mine: false, UserName: booking.UserName, Purpose: 'Admin revision' });
-    await complete(api.cancelBooking(booking.ID, auth('BookingManage')));
-    expect(await complete(api.getBookings())).not.toContainEqual(expect.objectContaining({ ID: booking.ID }));
+  it('creates, updates and cancels bookings', async () => {
+    const payload = { EquipmentID: 7, Start: booking.Start, End: booking.End, Purpose: 'Test' };
+    respond(201, { booking });
+    expect(await api.createBooking(payload)).toEqual(booking);
+    expect(lastCall()).toMatchObject({ method: 'POST', body: payload });
+
+    respond(200, { booking: { ...booking, Purpose: 'Revised' } });
+    expect((await api.updateBooking(3, { ...payload, Purpose: 'Revised' }, auth())).Purpose).toBe('Revised');
+    expect(lastCall()).toMatchObject({ method: 'PUT', body: { Purpose: 'Revised' } });
+    expect(lastCall().url).toMatch(/\/bookings\/3$/);
+
+    respond(204);
+    await api.cancelBooking(3, auth());
+    expect(lastCall()).toMatchObject({ method: 'DELETE' });
+    expect(lastCall().url).toMatch(/\/bookings\/3$/);
+  });
+
+  it('shows the server error message when there is one', async () => {
+    respond(409, { error: 'That time overlaps an existing booking.' });
+    await expect(api.createBooking({ EquipmentID: 7, Start: booking.Start, End: booking.End, Purpose: '' }))
+      .rejects.toThrow('That time overlaps an existing booking.');
+
+    respond(403);
+    await expect(api.cancelBooking(3, auth())).rejects.toThrow('Failed to cancel booking (403)');
   });
 });

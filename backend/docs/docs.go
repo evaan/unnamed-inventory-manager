@@ -15,6 +15,192 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/bookings": {
+            "get": {
+                "description": "Get current and upcoming bookings for all equipment, plus bookings that ended in the last 24 hours. Mine is true for the logged-in user's bookings",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Get bookings",
+                "responses": {
+                    "200": {
+                        "description": "Bookings",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "bookings": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/definitions/bookings.BookingDTO"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "500": {
+                        "description": "Error retrieving bookings"
+                    }
+                }
+            },
+            "post": {
+                "description": "Books equipment for the logged-in user. The slot must be in the future, within the next 7 days and the equipment's working hours, at most 8 hours (including back-to-back bookings by the same user), and must not overlap another booking",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Book equipment",
+                "parameters": [
+                    {
+                        "description": "Equipment, start and end time (RFC 3339) and purpose",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/bookings.BookingReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Booking created",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "booking": {
+                                    "$ref": "#/definitions/bookings.BookingDTO"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body, or the slot breaks a booking rule"
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "404": {
+                        "description": "Equipment not found"
+                    },
+                    "409": {
+                        "description": "The slot overlaps an existing booking"
+                    },
+                    "500": {
+                        "description": "Error creating booking"
+                    }
+                }
+            }
+        },
+        "/bookings/{id}": {
+            "put": {
+                "description": "Changes a booking's equipment, time or purpose. Allowed for the booking's owner or users with BookingManage. The booking keeps its owner and follows the same rules as a new booking",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Update booking",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Booking ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Equipment, start and end time (RFC 3339) and purpose",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/bookings.BookingReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Booking updated",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "booking": {
+                                    "$ref": "#/definitions/bookings.BookingDTO"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid booking ID or request body, or the slot breaks a booking rule"
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Not the owner and missing BookingManage"
+                    },
+                    "404": {
+                        "description": "Booking or equipment not found"
+                    },
+                    "409": {
+                        "description": "The slot overlaps an existing booking"
+                    },
+                    "500": {
+                        "description": "Error updating booking"
+                    }
+                }
+            },
+            "delete": {
+                "description": "Cancels a booking. Allowed for the booking's owner or users with BookingManage",
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Cancel booking",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Booking ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Booking cancelled"
+                    },
+                    "400": {
+                        "description": "Invalid booking ID"
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "403": {
+                        "description": "Not the owner and missing BookingManage"
+                    },
+                    "404": {
+                        "description": "Booking not found"
+                    },
+                    "500": {
+                        "description": "Error cancelling booking"
+                    }
+                }
+            }
+        },
         "/callback": {
             "get": {
                 "description": "Checks the oauth_state cookie, verifies the Google identity and email, starts a session and sends you back to the frontend.\nNew users follow signup_policy: open enables them, whitelist enables exact whitelisted email domain matches, and closed creates them disabled for approval.\nA matching non-empty ADMIN_EMAIL bypasses signup restrictions for new users. Existing users keep their disabled status",
@@ -243,6 +429,177 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Error moving category"
+                    }
+                }
+            }
+        },
+        "/equipment": {
+            "get": {
+                "description": "Get all bookable equipment",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Get equipment",
+                "responses": {
+                    "200": {
+                        "description": "Bookable equipment",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "equipment": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/definitions/bookings.Equipment"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not logged in"
+                    },
+                    "500": {
+                        "description": "Error retrieving equipment"
+                    }
+                }
+            },
+            "post": {
+                "description": "Adds bookable equipment. Requires BookingAdd",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Add equipment",
+                "parameters": [
+                    {
+                        "description": "Equipment details. Missing hours use the category default",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/bookings.EquipmentReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Equipment created",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "equipment": {
+                                    "$ref": "#/definitions/bookings.Equipment"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body"
+                    },
+                    "403": {
+                        "description": "Missing BookingAdd permission"
+                    },
+                    "500": {
+                        "description": "Error creating equipment"
+                    }
+                }
+            }
+        },
+        "/equipment/{id}": {
+            "put": {
+                "description": "Replaces bookable equipment details. Requires BookingModify. Existing bookings are kept",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Update equipment",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Equipment ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Equipment details. Missing hours use the category default",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/bookings.EquipmentReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Equipment updated",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "equipment": {
+                                    "$ref": "#/definitions/bookings.Equipment"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid equipment ID or request body"
+                    },
+                    "403": {
+                        "description": "Missing BookingModify permission"
+                    },
+                    "404": {
+                        "description": "Equipment not found"
+                    },
+                    "500": {
+                        "description": "Error updating equipment"
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes bookable equipment and all of its bookings. Requires BookingDelete",
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Delete equipment",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Equipment ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Equipment deleted"
+                    },
+                    "400": {
+                        "description": "Invalid equipment ID"
+                    },
+                    "403": {
+                        "description": "Missing BookingDelete permission"
+                    },
+                    "404": {
+                        "description": "Equipment not found"
+                    },
+                    "500": {
+                        "description": "Error deleting equipment"
                     }
                 }
             }
@@ -1008,6 +1365,134 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "bookings.BookingDTO": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "type": "string"
+                },
+                "equipmentID": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "mine": {
+                    "type": "boolean"
+                },
+                "purpose": {
+                    "type": "string"
+                },
+                "start": {
+                    "type": "string"
+                },
+                "userName": {
+                    "type": "string"
+                }
+            }
+        },
+        "bookings.BookingReq": {
+            "type": "object",
+            "required": [
+                "End",
+                "EquipmentID",
+                "Start"
+            ],
+            "properties": {
+                "End": {
+                    "type": "string"
+                },
+                "EquipmentID": {
+                    "type": "integer"
+                },
+                "Purpose": {
+                    "type": "string"
+                },
+                "Start": {
+                    "type": "string"
+                }
+            }
+        },
+        "bookings.Equipment": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "closeHour": {
+                    "description": "local hour the equipment closes, 1-24",
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "maintenanceNote": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "openHour": {
+                    "description": "local hour the equipment opens, 0-23",
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/bookings.EquipmentStatus"
+                }
+            }
+        },
+        "bookings.EquipmentReq": {
+            "type": "object",
+            "required": [
+                "Category",
+                "Location",
+                "Name",
+                "Status"
+            ],
+            "properties": {
+                "Category": {
+                    "type": "string"
+                },
+                "CloseHour": {
+                    "type": "integer"
+                },
+                "Description": {
+                    "type": "string"
+                },
+                "Location": {
+                    "type": "string"
+                },
+                "MaintenanceNote": {
+                    "type": "string"
+                },
+                "Name": {
+                    "type": "string"
+                },
+                "OpenHour": {
+                    "type": "integer"
+                },
+                "Status": {
+                    "$ref": "#/definitions/bookings.EquipmentStatus"
+                }
+            }
+        },
+        "bookings.EquipmentStatus": {
+            "type": "string",
+            "enum": [
+                "ACTIVE",
+                "MAINTENANCE"
+            ],
+            "x-enum-varnames": [
+                "EquipmentActive",
+                "EquipmentMaintenance"
+            ]
         },
         "inventory.CreateItemCategoryReq": {
             "type": "object",

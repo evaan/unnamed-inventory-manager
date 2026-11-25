@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/evaandev/unnamed-inventory-manager/auth"
+	"github.com/evaandev/unnamed-inventory-manager/bookings"
 	_ "github.com/evaandev/unnamed-inventory-manager/docs"
 	"github.com/evaandev/unnamed-inventory-manager/inventory"
 	"github.com/evaandev/unnamed-inventory-manager/middleware"
@@ -109,6 +110,38 @@ func Register(router *gin.Engine, db *gorm.DB, oauthCfg *oauth2.Config, frontend
 
 		private.GET("/logs", func(c *gin.Context) {
 			inventory.GetLogs(c, db)
+		})
+
+		private.GET("/equipment", func(c *gin.Context) {
+			bookings.GetEquipment(c, db)
+		})
+
+		private.POST("/equipment", middleware.PermissionRequired(db, auth.PermissionBookingAdd), func(c *gin.Context) {
+			bookings.CreateEquipment(c, db)
+		})
+
+		private.PUT("/equipment/:id", middleware.PermissionRequired(db, auth.PermissionBookingModify), func(c *gin.Context) {
+			bookings.UpdateEquipment(c, db)
+		})
+
+		private.DELETE("/equipment/:id", middleware.PermissionRequired(db, auth.PermissionBookingDelete), func(c *gin.Context) {
+			bookings.DeleteEquipment(c, db)
+		})
+
+		private.GET("/bookings", func(c *gin.Context) {
+			bookings.GetBookings(c, db)
+		})
+
+		private.POST("/bookings", func(c *gin.Context) {
+			bookings.CreateBooking(c, db)
+		})
+
+		private.PUT("/bookings/:id", func(c *gin.Context) {
+			bookings.UpdateBooking(c, db)
+		})
+
+		private.DELETE("/bookings/:id", func(c *gin.Context) {
+			bookings.CancelBooking(c, db)
 		})
 
 	}
