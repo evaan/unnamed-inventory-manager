@@ -17,6 +17,8 @@ services:
       - /app/node_modules
     depends_on:
       - backend
+    networks:
+      - inventory-network
 
   backend:
     build:
@@ -40,6 +42,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - inventory-network
 
   postgres:
     image: postgres:19-alpine
@@ -54,8 +58,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - inventory-network
 
 volumes:
   postgres-data:
   go-mod-cache:
   go-build-cache:
+
+networks:
+  inventory-network:
+    driver: bridge
