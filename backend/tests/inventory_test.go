@@ -369,6 +369,63 @@ func TestCreateAndDeleteCategory(t *testing.T) {
 	requireStatus(t, makeRequest(router, http.MethodDelete, "/categories/"+child.ID.String(), "", adminToken), http.StatusNoContent)
 }
 
+func TestDeleteNestedCategory(t *testing.T) {
+	router, db := newAuthRouter(t)
+	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		t.Fatal(err)
+	}
+	_, token := newTestSession(t, db, auth.PermissionDeleteTag)
+
+	top := inventory.ItemCategory{ID: uuid.New(), CategoryName: "Top"}
+	middle := inventory.ItemCategory{ID: uuid.New(), CategoryName: "Middle", ParentID: &top.ID}
+	bottom := inventory.ItemCategory{ID: uuid.New(), CategoryName: "Bottom", ParentID: &middle.ID}
+	sibling := inventory.ItemCategory{ID: uuid.New(), CategoryName: "Sibling", ParentID: &middle.ID}
+	descendant := inventory.ItemCategory{ID: uuid.New(), CategoryName: "Descendant", ParentID: &bottom.ID}
+	for _, category := range []*inventory.ItemCategory{&top, &middle, &bottom, &sibling, &descendant} {
+		if err := db.Create(category).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	item := inventory.Item{
+		ID: uuid.New(), ItemName: "Test item", Manufacturer: "Test company", ManufacturerPart: "A1",
+		Categories: []inventory.ItemCategory{middle, bottom},
+	}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	path := "/categories/" + middle.ID.String()
+	requireStatus(t, makeRequest(router, http.MethodDelete, path, "", token), http.StatusNoContent)
+	requireStatus(t, makeRequest(router, http.MethodDelete, path, "", token), http.StatusNotFound)
+
+	for _, child := range []inventory.ItemCategory{bottom, sibling} {
+		var remaining inventory.ItemCategory
+		if err := db.First(&remaining, "id = ?", child.ID).Error; err != nil {
+			t.Fatal(err)
+		}
+		if remaining.ParentID == nil || *remaining.ParentID != top.ID {
+			t.Errorf("Expected %s to remain nested under Top, got %+v", child.CategoryName, remaining)
+		}
+	}
+	var remainingDescendant inventory.ItemCategory
+	if err := db.First(&remainingDescendant, "id = ?", descendant.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if remainingDescendant.ParentID == nil || *remainingDescendant.ParentID != bottom.ID {
+		t.Fatal("Expected deeper descendants to keep their existing parent")
+	}
+	var remainingItem inventory.Item
+	if err := db.Preload("Categories").First(&remainingItem, "id = ?", item.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(remainingItem.Categories) != 1 || remainingItem.Categories[0].ID != bottom.ID {
+		t.Fatalf("Expected only the deleted category to be removed from the item, got %+v", remainingItem.Categories)
+	}
+	if remainingItem.Categories[0].ParentID == nil || *remainingItem.Categories[0].ParentID != top.ID {
+		t.Fatal("Expected the item's bottom category to be nested under Top")
+	}
+}
+
 func TestAddSubCategory(t *testing.T) {
 	router, db := newAuthRouter(t)
 	_, adminToken := newTestSession(t, db, auth.PermissionAdministrator)

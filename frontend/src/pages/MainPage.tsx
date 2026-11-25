@@ -256,10 +256,13 @@ export const MainPage = () => {
     if (!canDeleteTags) return;
     const path = categoryHierarchy.get(tag.ID)?.path ?? tag.Name;
     const hasChildren = tags.some((category) => category.ParentID === tag.ID);
+    const parent = tag.ParentID ? categoryHierarchy.get(tag.ParentID) : undefined;
     if (!await confirm({
       title: 'Delete category?',
       message: `Delete the category "${path}"? It will be removed from every item.` +
-        (hasChildren ? ' Its direct subcategories will become top-level categories.' : ''),
+        (hasChildren ? (parent
+          ? ` Its direct subcategories will move under "${parent.path}".`
+          : ' Its direct subcategories will become top-level categories.') : ''),
       confirmLabel: 'Delete category',
       destructive: true,
     })) return;
@@ -267,8 +270,10 @@ export const MainPage = () => {
     try {
       await Promise.all([cancelItems(), cancelTags()]);
       await deleteTag(tag.ID);
-      setTags((prev) => prev.filter((t) => t.ID !== tag.ID).map((t) => t.ParentID === tag.ID ? { ...t, ParentID: null } : t));
-      setItems((prev) => prev.map((i) => ({ ...i, Tags: (i.Tags ?? []).filter((t) => t.ID !== tag.ID) })));
+      const reparentTag = (category: Tag) =>
+        category.ParentID === tag.ID ? { ...category, ParentID: tag.ParentID ?? null } : category;
+      setTags((prev) => prev.filter((t) => t.ID !== tag.ID).map(reparentTag));
+      setItems((prev) => prev.map((i) => ({ ...i, Tags: (i.Tags ?? []).filter((t) => t.ID !== tag.ID).map(reparentTag) })));
       setActiveTagIds((prev) => prev.filter((id) => id !== tag.ID));
     } catch (e) {
       fail(e);
