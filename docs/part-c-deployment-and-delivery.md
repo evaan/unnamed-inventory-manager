@@ -2,8 +2,6 @@
 
 # Part C: Deployment and Delivery
 
-In Assignment 1 (Part C, "Continuous Integration Implementation and MVP Testing"), the pipeline built, linted and tested every feature branch and squash-merged passing pull requests into `main`. Deployment was left for later. The report said the backend team would look at deploying "possibly using Google Cloud". Until this assignment, deployment was a manual step: a team member logged in to the server, checked out `main` and rebuilt the containers. This part records how the CI changed since Assignment 1 and extends it so that a commit that passes CI is delivered to production automatically. It also describes the environment we chose, how a release reaches it, how to undo a release, and the evidence that it works.
-
 ## C.1 Changes to continuous integration since Assignment 1
 
 The CI described in Assignment 1 is still the first stage of the pipeline, with these changes:
@@ -51,28 +49,6 @@ The CI described in Assignment 1 is still the first stage of the pipeline, with 
 
 The pipeline now has two workflows. Figure C.1 shows the full path from a pushed branch to production.
 
-```
- developer pushes a feature branch
-            │
-            ▼
- ┌─────────────────────── CI (auto-merge.yml) ───────────────────────┐
- │ backend: build → go test, gofmt + go vet, Swagger docs up to date │
- │ frontend: build → Vitest tests, ESLint                            │
- │ all green → squash-merge PR into main → start Deliver             │
- └───────────────────────────────────────────────────────────────────┘
-            │
-            ▼
- ┌─────────────────────── Deliver (deliver.yml) ─────────────────────┐
- │ 1. same backend + frontend checks again, on the merged commit     │
- │ 2. build backend + frontend images once, push to GHCR             │
- │    tagged with the commit SHA                                     │
- │ 3. deploy job on the production server (self-hosted runner):      │
- │    back up DB → check out SHA → pull images → docker compose up   │
- │    → health check → on failure, roll back to the previous SHA     │
- └───────────────────────────────────────────────────────────────────┘
-```
-*Figure C.1: The delivery pipeline.*
-
 Design decisions:
 
 - **Build once, deploy the same thing.** Each image is built once in the pipeline and tagged with the commit SHA (for example `ghcr.io/evaan/unnamed-inventory-manager/backend:<sha>`). Before this change, the server rebuilt from source on every deploy, so the binary in production was never the one CI had tested. The SHA tag also makes rollback quick: redeploying an old release only pulls an existing image.
@@ -95,32 +71,6 @@ The full procedure is in the Operations Guide (Appendix [TODO letter], `docs/ope
 5. **Check health.** Run `scripts/healthcheck.sh` (it should print `RESULT healthy`) and `docker compose ps` (every container `running`, postgres `healthy`).
 
 **Keeping secrets out of the repository.** `.env`, the database folder and the backups folder are git-ignored. While extending the pipeline we found that `compose.yml` still contained the database password (`admin`) in plain text. We moved it to `.env` as `POSTGRES_PASSWORD`, and Compose now refuses to start if it is missing. The operations guide explains how to change the password on the existing database. The pipeline needs no stored secrets. It uses GitHub's short-lived `GITHUB_TOKEN` to push and pull images, and the deploy job reads `.env` directly on the server.
-
-## C.5 Evidence
-
-[TODO: For every figure, write the date and the commit SHA shown in the run, and check that no secrets are visible.]
-
-**Figure C.2: A successful Deliver pipeline run.** [TODO: screenshot of Actions → Deliver showing all jobs green: backend, frontend, publish (backend), publish (frontend) and deploy. Caption: "Deliver run #N for commit `<sha>`, <date>. The merged commit passed all checks, its images were published and it was deployed and passed the health check." Link: `https://github.com/evaan/unnamed-inventory-manager/actions/runs/<id>`.]
-
-**Figure C.3: Deployment record.** [TODO: screenshot of the repository's *Deployments → production* page, or the run summary showing the health-check output. Caption: "Production is running commit `<sha>`, deployed by the pipeline on <date>."]
-
-**Figure C.4: The deployed system working.** [TODO: screenshot of https://inventory.evaan.dev after signing in, showing the inventory page. Crop out email addresses if needed. Caption: "The deployed system at <date>, commit `<sha>`."]
-
-**Figure C.5 (optional): Automatic rollback.** [TODO: if you test it, push a branch whose backend exits on start, and screenshot the failed Deliver run showing the "Roll back to the previous release" step. Caption: "A failing release was rolled back automatically, and production stayed on `<previous sha>`."]
-
-The live demonstration (in the lab, or a video of up to 5 minutes) is submitted separately. [TODO: link to the video, if recorded.]
-
-**Rows for the evidence index (Part C):**
-
-| Claim | Evidence | Where |
-|-------|----------|-------|
-| The pipeline builds, tests, publishes and deploys `main` | Pipeline definition; successful run | `.github/workflows/deliver.yml`; Figure C.2; [TODO run link] |
-| CI hands a merged commit to delivery | Merge job starts Deliver | `.github/workflows/auto-merge.yml` |
-| Production runs the pipeline-built release | Deployment record and health-check artifact | Figure C.3; `deployment-<sha>` artifact of run [TODO] |
-| The deployed system answers on the public URL | Health-check capture: `/` and `/api/whoami` return HTTP 200 | `evidence/deployment/healthcheck.txt` [TODO: replace with the pipeline's capture]; Figure C.4 |
-| Deployment, configuration, rollback and health checks are documented | Operations guide | `docs/operations-guide.md`; Appendix [TODO] |
-| No passwords or keys are in the repository | Secrets read from git-ignored `.env`; stack refuses to start without them | `compose.yml`, `.env.example`, `.gitignore` |
-| A failed release is rolled back automatically | Rollback step; [optional] failed run | `.github/workflows/deliver.yml`; Figure C.5 |
 
 ## C.6 Limitations and next steps
 
