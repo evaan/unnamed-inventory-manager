@@ -8,17 +8,18 @@ import (
 )
 
 type Item struct {
-	ID               uuid.UUID      `gorm:"type:uuid;primaryKey"`
-	ItemName         string         `gorm:"not null"`
-	Quantity         int32          `gorm:"type:integer;not null"`
-	Manufacturer     string         `gorm:"not null"`
-	ManufacturerPart string         `gorm:"not null"`
-	Categories       []ItemCategory `gorm:"many2many:ItemCategoryLinks;"`
-	DistributorPart  string         // Digikey or McMaster part number
-	DistributorURL   string
-	DataSheetURL     string
-	Description      string
-	DeletedAt        gorm.DeletedAt
+	ID                uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	ItemName          string         `gorm:"not null"`
+	Quantity          int32          `gorm:"type:integer;not null"`
+	LowStockThreshold *int32         `gorm:"type:integer;not null;default:10"` // Pointer preserves an explicit zero when creating an item.
+	Manufacturer      string         `gorm:"not null"`
+	ManufacturerPart  string         `gorm:"not null"`
+	Categories        []ItemCategory `gorm:"many2many:ItemCategoryLinks;"`
+	DistributorPart   string         // Digikey or McMaster part number
+	DistributorURL    string
+	DataSheetURL      string
+	Description       string
+	DeletedAt         gorm.DeletedAt
 }
 
 type Changelog struct {
@@ -43,29 +44,31 @@ const (
 )
 
 type UpdateItemReq struct {
-	ItemName         *string      `json:"itemName"`
-	Quantity         *int32       `json:"quantity"`
-	Manufacturer     *string      `json:"manufacturer"`
-	ManufacturerPart *string      `json:"manufacturerPart"`
-	Categories       *[]uuid.UUID `json:"categories"`
-	DistributorPart  *string      `json:"distributorPart"`
-	DistributorURL   *string      `json:"distributorURL"`
-	ItemDescription  *string      `json:"itemDescription"`
-	DataSheetURL     *string      `json:"dataSheetURL"`
-	LogDescription   *string      `json:"logDescription"`
+	ItemName          *string      `json:"itemName"`
+	Quantity          *int32       `json:"quantity"`
+	LowStockThreshold *int32       `json:"lowStockThreshold" binding:"omitempty,gte=0" minimum:"0" maximum:"2147483647"`
+	Manufacturer      *string      `json:"manufacturer"`
+	ManufacturerPart  *string      `json:"manufacturerPart"`
+	Categories        *[]uuid.UUID `json:"categories"`
+	DistributorPart   *string      `json:"distributorPart"`
+	DistributorURL    *string      `json:"distributorURL"`
+	ItemDescription   *string      `json:"itemDescription"`
+	DataSheetURL      *string      `json:"dataSheetURL"`
+	LogDescription    *string      `json:"logDescription"`
 }
 
 type CreateItemReq struct {
-	ItemName         string       `json:"itemName" binding:"required"`
-	Quantity         *int32       `json:"quantity" binding:"required"`
-	Manufacturer     string       `json:"manufacturer" binding:"required"`
-	ManufacturerPart string       `json:"manufacturerPart" binding:"required"`
-	Categories       *[]uuid.UUID `json:"categories"`
-	DistributorPart  string       `json:"distributorPart"`
-	DistributorURL   string       `json:"distributorURL"`
-	DataSheetURL     string       `json:"dataSheetURL"`
-	Description      string       `json:"description"`
-	LogDescription   string       `json:"logDescription"`
+	ItemName          string       `json:"itemName" binding:"required"`
+	Quantity          *int32       `json:"quantity" binding:"required"`
+	LowStockThreshold *int32       `json:"lowStockThreshold" binding:"omitempty,gte=0" minimum:"0" maximum:"2147483647" default:"10"`
+	Manufacturer      string       `json:"manufacturer" binding:"required"`
+	ManufacturerPart  string       `json:"manufacturerPart" binding:"required"`
+	Categories        *[]uuid.UUID `json:"categories"`
+	DistributorPart   string       `json:"distributorPart"`
+	DistributorURL    string       `json:"distributorURL"`
+	DataSheetURL      string       `json:"dataSheetURL"`
+	Description       string       `json:"description"`
+	LogDescription    string       `json:"logDescription"`
 }
 
 type ItemDTO struct {

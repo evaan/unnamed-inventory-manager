@@ -9,6 +9,9 @@ func createNewItem(req UpdateItemReq) map[string]interface{} {
 	if req.Quantity != nil {
 		newItem["quantity"] = *req.Quantity
 	}
+	if req.LowStockThreshold != nil {
+		newItem["low_stock_threshold"] = *req.LowStockThreshold
+	}
 	if req.Manufacturer != nil {
 		newItem["manufacturer"] = *req.Manufacturer
 	}

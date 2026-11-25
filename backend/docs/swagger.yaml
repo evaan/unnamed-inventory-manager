@@ -134,6 +134,11 @@ definitions:
         type: string
       logDescription:
         type: string
+      lowStockThreshold:
+        default: 10
+        maximum: 2147483647
+        minimum: 0
+        type: integer
       manufacturer:
         type: string
       manufacturerPart:
@@ -173,6 +178,10 @@ definitions:
         type: string
       logDescription:
         type: string
+      lowStockThreshold:
+        maximum: 2147483647
+        minimum: 0
+        type: integer
       manufacturer:
         type: string
       manufacturerPart:

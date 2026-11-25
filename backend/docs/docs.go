@@ -1547,6 +1547,12 @@ const docTemplate = `{
                 "logDescription": {
                     "type": "string"
                 },
+                "lowStockThreshold": {
+                    "type": "integer",
+                    "default": 10,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                },
                 "manufacturer": {
                     "type": "string"
                 },
@@ -1597,6 +1603,11 @@ const docTemplate = `{
                 },
                 "logDescription": {
                     "type": "string"
+                },
+                "lowStockThreshold": {
+                    "type": "integer",
+                    "maximum": 2147483647,
+                    "minimum": 0
                 },
                 "manufacturer": {
                     "type": "string"
