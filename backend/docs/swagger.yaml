@@ -408,7 +408,8 @@ paths:
   /categories/{id}:
     delete:
       description: Removes the category from all items and moves its direct children
-        to its parent, or to the top level if it has no parent. Requires DeleteTag or Administrator.
+        to its parent, or to the top level if it has no parent. Requires DeleteTag
+        or Administrator.
       parameters:
       - description: Item Category ID
         format: uuid
