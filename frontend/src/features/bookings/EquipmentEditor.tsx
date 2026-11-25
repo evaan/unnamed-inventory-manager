@@ -31,7 +31,7 @@ export const EquipmentEditor = ({ equipment, categories, onSave, onClose, onSavi
     return () => cancelAnimationFrame(id);
   }, []);
   const hours = equipmentHours(draft);
-  const icon: EquipmentIconName = draft.Icon ?? 'wrench';
+  const icon = draft.Icon ?? 'wrench';
   const setHours = (open: number, close: number) => {
     setDraft((previous) => ({ ...previous, OpenHour: open, CloseHour: close }));
     setError('');

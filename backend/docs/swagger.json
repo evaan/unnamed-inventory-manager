@@ -1421,6 +1421,9 @@
                 "description": {
                     "type": "string"
                 },
+                "icon": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -1458,6 +1461,9 @@
                     "type": "integer"
                 },
                 "Description": {
+                    "type": "string"
+                },
+                "Icon": {
                     "type": "string"
                 },
                 "Location": {
