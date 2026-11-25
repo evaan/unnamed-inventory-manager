@@ -29,8 +29,9 @@ type Equipment struct {
 	Description     string
 	Status          EquipmentStatus `gorm:"type:varchar(20);not null"`
 	MaintenanceNote string
-	OpenHour        int `gorm:"not null"` // local hour the equipment opens, 0-23
-	CloseHour       int `gorm:"not null"` // local hour the equipment closes, 1-24
+	OpenHour        int    `gorm:"not null"` // local hour the equipment opens, 0-23
+	CloseHour       int    `gorm:"not null"` // local hour the equipment closes, 1-24
+	Icon            string `gorm:"not null;default:''"`
 }
 
 type Booking struct {
@@ -54,7 +55,16 @@ type EquipmentReq struct {
 	MaintenanceNote string          `json:"MaintenanceNote"`
 	OpenHour        *int            `json:"OpenHour"`
 	CloseHour       *int            `json:"CloseHour"`
+	Icon            string          `json:"Icon"`
 }
+
+var validIcons = map[string]bool{
+	"":       true, // no choice: the frontend falls back to the category icon
+	"wrench": true, "printer": true, "scissors": true,
+	"hammer": true, "zap": true, "cpu": true,
+}
+
+func (r EquipmentReq) IconValid() bool { return validIcons[r.Icon] }
 
 // BookingReq is the body for creating or updating a booking. The owner always comes from the session.
 type BookingReq struct {

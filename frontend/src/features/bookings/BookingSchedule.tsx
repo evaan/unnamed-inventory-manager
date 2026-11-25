@@ -2,12 +2,13 @@ import { useRef, useState } from 'react';
 import { Activity, CircuitBoard, MapPin, Printer, ScanLine, Wrench } from 'lucide-react';
 import type { Booking, Equipment } from './bookingsapi';
 import { bookingError, equipmentHours, formatEquipmentHours, freeHours, hourToTime, MAX_HOURS, overlaps, pad, SLOT_HOURS } from './bookingTime';
+import { iconFor } from './equipmentIcons';
 
-export const CategoryIcon = ({ category, className }: { category: string; className?: string }) => {
-  const Icon = category === '3D printers' ? Printer
+export const CategoryIcon = ({ category, icon, className }: { category: string; icon?: string; className?: string }) => {
+  const Icon = iconFor(icon) ?? (category === '3D printers' ? Printer
     : category === 'Soldering' ? CircuitBoard
     : category === 'Test equipment' ? Activity
-    : category === 'Fabrication' ? ScanLine : Wrench;
+    : category === 'Fabrication' ? ScanLine : Wrench);
   return <Icon className={className} aria-hidden="true" />;
 };
 
@@ -73,7 +74,7 @@ export const BookingSchedule = ({ equipment, bookings, day, now, selectedId, loa
               aria-pressed={selectedId === eq.ID}
               className={`sticky left-0 z-10 flex w-52 shrink-0 items-center gap-2.5 border-r border-slate-800 px-3 py-2.5 text-left enabled:hover:bg-slate-800 disabled:cursor-default ${selectedId === eq.ID ? 'bg-slate-800' : 'bg-slate-900'}`}
             >
-              <CategoryIcon category={eq.Category} className="h-4 w-4 shrink-0 text-slate-400" />
+              <CategoryIcon category={eq.Category} icon={eq.Icon} className="h-4 w-4 shrink-0 text-slate-400" />
               <span className="min-w-0">
                 <span className="block truncate text-sm font-medium">{eq.Name}</span>
                 <span className="mt-1 flex items-center gap-1 text-[10px] text-slate-500">

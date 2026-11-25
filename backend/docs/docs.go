@@ -1427,6 +1427,9 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "icon": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -1464,6 +1467,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "Description": {
+                    "type": "string"
+                },
+                "Icon": {
                     "type": "string"
                 },
                 "Location": {

@@ -15,6 +15,7 @@ export interface Equipment {
   // Daily working hours in the server's time zone; the server fills in category defaults.
   OpenHour?: number;
   CloseHour?: number;
+  Icon?: string
 }
 
 export type NewEquipment = Omit<Equipment, 'ID'>;
