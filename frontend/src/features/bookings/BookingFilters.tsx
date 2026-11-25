@@ -1,7 +1,6 @@
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { CategoryIcon } from './BookingSchedule';
 import type { Equipment } from './bookingsapi';
-import { iconFor } from './equipmentIcons';
 
 export const BookingFilters = ({ open, onToggleOpen, equipment, category, onCategory, availableNow, onAvailableNow, showAvailability = true }: {
   open: boolean;
