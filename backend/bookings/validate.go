@@ -30,6 +30,7 @@ func equipmentFromRequest(req EquipmentReq) (Equipment, error) {
 		Location:    strings.TrimSpace(req.Location),
 		Description: strings.TrimSpace(req.Description),
 		Status:      req.Status,
+		Icon:        req.Icon,
 	}
 	if equipment.Name == "" || equipment.Category == "" || equipment.Location == "" {
 		return equipment, errors.New("Name, category, and location are required.")
@@ -39,6 +40,9 @@ func equipmentFromRequest(req EquipmentReq) (Equipment, error) {
 	}
 	if equipment.Status == EquipmentMaintenance {
 		equipment.MaintenanceNote = strings.TrimSpace(req.MaintenanceNote)
+	}
+	if !req.IconValid() {
+		return equipment, errors.New("Invalid equipment icon.")
 	}
 
 	equipment.OpenHour, equipment.CloseHour = defaultHours(equipment.Category)

@@ -4,6 +4,7 @@ import { Field } from '../../components/Field';
 import { INPUT } from '../../components/styles';
 import type { Equipment, NewEquipment } from './bookingsapi';
 import { equipmentHours, equipmentHoursError, pad } from './bookingTime';
+import { EQUIPMENT_ICONS, type EquipmentIconName } from './equipmentIcons';
 
 export const EquipmentEditor = ({ equipment, categories, onSave, onClose, onSavingChange, onDelete, readOnly = false, busy = false, errorMessage = '' }: {
   equipment: Equipment | null;
@@ -30,6 +31,7 @@ export const EquipmentEditor = ({ equipment, categories, onSave, onClose, onSavi
     return () => cancelAnimationFrame(id);
   }, []);
   const hours = equipmentHours(draft);
+  const icon: EquipmentIconName = draft.Icon ?? 'wrench';
   const setHours = (open: number, close: number) => {
     setDraft((previous) => ({ ...previous, OpenHour: open, CloseHour: close }));
     setError('');
@@ -72,6 +74,25 @@ export const EquipmentEditor = ({ equipment, categories, onSave, onClose, onSavi
             <input required list="equipment-categories" value={draft.Category} onChange={(e) => set('Category', e.target.value)} className={INPUT} />
             <datalist id="equipment-categories">{categories.map((category) => <option key={category} value={category} />)}</datalist>
           </Field>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Icon</legend>
+            <div role="radiogroup" aria-label="Icon" className="flex flex-wrap gap-2">
+              {(Object.entries(EQUIPMENT_ICONS) as [EquipmentIconName, (typeof EQUIPMENT_ICONS)[EquipmentIconName]][]).map(([name, Icon]) => (
+                <button
+                  key={name}
+                  type="button"
+                  role="radio"
+                  aria-checked={icon === name}
+                  aria-label={name}
+                  title={name}
+                  onClick={() => set('Icon', name)}
+                  className={`ui-icon-button ${icon === name ? 'bg-white/10 text-white' : ''}`}
+                >
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Working hours</legend>
             <div className="grid grid-cols-2 gap-3">
