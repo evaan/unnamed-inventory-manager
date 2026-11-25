@@ -1,0 +1,244 @@
+@startuml backend-use-case
+' Backend use case diagram (Go / Gin REST API, PostgreSQL).
+'
+' Shows what the API lets each kind of caller do, and the checks the server runs.
+' Each use case names its endpoint. Callers normally reach the API through the
+' React frontend (see frontend-use-case.puml).
+'
+' Route groups in backend/routes/routes.go:
+'   public   AuthOptional    /login, /callback, /whoami
+'   session  SessionRequired /logout (disabled users allowed)
+'   private  AuthRequired    enabled user; some routes also need a permission
+'   admin    AdminRequired   Administrator only
+' Every request also passes the CORS and CSRF Origin/Referer checks.
+'
+' Actors that hold permissions are specialisations of "User". Administrator
+' passes every permission check, so it inherits every role.
+
+title Unnamed Inventory Manager: Backend Use Case Diagram
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor<<check>> #F3EAF7
+  BorderColor<<check>> #7A4A9A
+}
+
+' ---------------------------------------------------------------- actors
+actor "API Client\n(no session)" as Visitor
+actor "Disabled User" as Disabled
+actor "User\n(enabled session)" as User
+actor "Item Editor\n(CreateItem / ModifyItem /\nDeleteItem)" as ItemEditor
+actor "Category Manager\n(CreateTag / DeleteTag)" as CategoryManager
+actor "Equipment Manager\n(BookingAdd / BookingModify /\nBookingDelete)" as EquipmentManager
+actor "Booking Manager\n(BookingManage)" as BookingManager
+actor "Administrator" as Admin
+actor "Google OAuth" as Google <<external system>>
+database "PostgreSQL" as DB
+
+ItemEditor -|> User
+CategoryManager -|> User
+EquipmentManager -|> User
+BookingManager -|> User
+Admin -|> ItemEditor
+Admin -|> CategoryManager
+Admin -|> EquipmentManager
+Admin -|> BookingManager
+
+rectangle "Backend API (Go / Gin)" {
+
+  ' ------------------------------------------------ shared checks
+  package "Request checks (middleware)" {
+    usecase "Check CORS / CSRF origin" as UC_CSRF <<check>>
+    usecase "Authenticate session cookie" as UC_Session <<check>>
+    usecase "Check permission\n(or Administrator)" as UC_Perm <<check>>
+    usecase "Check Administrator" as UC_AdminCheck <<check>>
+  }
+
+  ' ------------------------------------------------ auth
+  package "Auth" {
+    usecase "Start Google login\nGET /login" as UC_Login
+    usecase "Finish login\nGET /callback" as UC_Callback
+    usecase "Verify Google identity\nand email" as UC_Verify
+    usecase "Create account\n(apply signup policy)" as UC_Signup
+    usecase "Grant Administrator\nto ADMIN_EMAIL\n(if no admin exists)" as UC_Bootstrap
+    usecase "Start session" as UC_StartSession
+    usecase "Get current user\nGET /whoami" as UC_WhoAmI
+    usecase "Get own permissions\nGET /permissions" as UC_MyPerms
+    usecase "Log out\nPOST /logout" as UC_Logout
+  }
+
+  ' ------------------------------------------------ inventory
+  package "Inventory" {
+    usecase "List items\nGET /items" as UC_Items
+    usecase "Get item\nGET /items/:id" as UC_Item
+    usecase "Add item\nPOST /items" as UC_AddItem
+    usecase "Update item and\nits categories\nPUT /items/:id" as UC_UpdateItem
+    usecase "Delete item\nDELETE /items/:id" as UC_DeleteItem
+    usecase "Record changelog entry" as UC_RecordLog
+    usecase "Get changelog\nGET /logs" as UC_Logs
+    usecase "List categories\nGET /categories" as UC_Cats
+    usecase "Get category\nGET /categories/:id" as UC_Cat
+    usecase "Create category\nPOST /categories" as UC_CreateCat
+    usecase "Move category\nPATCH /categories/:id" as UC_MoveCat
+    usecase "Delete category\nDELETE /categories/:id" as UC_DeleteCat
+  }
+
+  ' ------------------------------------------------ bookings
+  package "Equipment & Bookings" {
+    usecase "List equipment\nGET /equipment" as UC_Equipment
+    usecase "Add equipment\nPOST /equipment" as UC_AddEq
+    usecase "Update equipment\nPUT /equipment/:id" as UC_EditEq
+    usecase "Delete equipment and\nits bookings\nDELETE /equipment/:id" as UC_RemoveEq
+    usecase "List bookings\nGET /bookings" as UC_Bookings
+    usecase "Book equipment\nPOST /bookings" as UC_Book
+    usecase "Update booking\nPUT /bookings/:id" as UC_UpdateBooking
+    usecase "Cancel booking\nDELETE /bookings/:id" as UC_CancelBooking
+    usecase "Check owner or\nBookingManage" as UC_Owner <<check>>
+    usecase "Validate booking slot" as UC_Validate <<check>>
+  }
+
+  ' ------------------------------------------------ admin
+  package "Administration" {
+    usecase "List users\nGET /users" as UC_Users
+    usecase "Get user\nGET /user/:id" as UC_User
+    usecase "Enable / disable user\nPATCH /user/:id" as UC_Disable
+    usecase "Get user permissions\nGET /permissions/:id" as UC_UserPerms
+    usecase "Replace user permissions\nPUT /permissions/:id" as UC_PutPerms
+    usecase "Get settings\nGET /settings" as UC_Settings
+    usecase "Create setting\nPOST /settings" as UC_CreateSetting
+    usecase "Update settings\nPATCH /settings" as UC_PatchSettings
+  }
+}
+
+' ================================================================ actor links
+
+Visitor --> UC_Login
+Visitor --> UC_Callback
+Visitor --> UC_WhoAmI
+UC_Login -- Google
+UC_Verify -- Google
+
+Disabled --> UC_WhoAmI
+Disabled --> UC_Logout
+
+User --> UC_WhoAmI
+User --> UC_MyPerms
+User --> UC_Logout
+User --> UC_Items
+User --> UC_Item
+User --> UC_Logs
+User --> UC_Cats
+User --> UC_Cat
+User --> UC_Equipment
+User --> UC_Bookings
+User --> UC_Book
+User --> UC_UpdateBooking
+User --> UC_CancelBooking
+
+ItemEditor --> UC_AddItem
+ItemEditor --> UC_UpdateItem
+ItemEditor --> UC_DeleteItem
+
+CategoryManager --> UC_CreateCat
+CategoryManager --> UC_MoveCat
+CategoryManager --> UC_DeleteCat
+
+EquipmentManager --> UC_AddEq
+EquipmentManager --> UC_EditEq
+EquipmentManager --> UC_RemoveEq
+
+BookingManager --> UC_UpdateBooking
+BookingManager --> UC_CancelBooking
+
+Admin --> UC_Users
+Admin --> UC_User
+Admin --> UC_Disable
+Admin --> UC_UserPerms
+Admin --> UC_PutPerms
+Admin --> UC_Settings
+Admin --> UC_CreateSetting
+Admin --> UC_PatchSettings
+
+' ================================================================ include / extend
+
+UC_Callback .> UC_Verify : <<include>>
+UC_Callback .> UC_StartSession : <<include>>
+UC_Signup .> UC_Callback : <<extend>>\n[first login]
+UC_Bootstrap .> UC_Callback : <<extend>>\n[email = ADMIN_EMAIL,\naccount enabled]
+
+UC_AddItem .> UC_Perm : <<include>>
+UC_UpdateItem .> UC_Perm : <<include>>
+UC_DeleteItem .> UC_Perm : <<include>>
+UC_CreateCat .> UC_Perm : <<include>>
+UC_MoveCat .> UC_Perm : <<include>>
+UC_DeleteCat .> UC_Perm : <<include>>
+UC_AddEq .> UC_Perm : <<include>>
+UC_EditEq .> UC_Perm : <<include>>
+UC_RemoveEq .> UC_Perm : <<include>>
+
+UC_AddItem .> UC_RecordLog : <<include>>
+UC_UpdateItem .> UC_RecordLog : <<include>>
+UC_DeleteItem .> UC_RecordLog : <<include>>
+
+UC_Book .> UC_Validate : <<include>>
+UC_UpdateBooking .> UC_Validate : <<include>>
+UC_UpdateBooking .> UC_Owner : <<include>>
+UC_CancelBooking .> UC_Owner : <<include>>
+
+UC_Items .> UC_Session : <<include>>
+UC_Logout .> UC_Session : <<include>>\n[disabled allowed]
+UC_Book .> UC_CSRF : <<include>>
+
+UC_Users .> UC_AdminCheck : <<include>>
+UC_Disable .> UC_AdminCheck : <<include>>
+UC_PutPerms .> UC_AdminCheck : <<include>>
+UC_PatchSettings .> UC_AdminCheck : <<include>>
+
+' ================================================================ persistence
+
+UC_RecordLog -- DB
+UC_StartSession -- DB
+
+note right of UC_Session
+  Runs on every private, session and admin route.
+  Disabled users are rejected except on /logout
+  and /whoami (AuthOptional).
+end note
+
+note bottom of UC_Validate
+  Equipment must be ACTIVE (not in maintenance).
+  Start is in the future, end after start.
+  Inside the next 7 days.
+  At most 8 hours, counting back-to-back
+  bookings by the same user.
+  Inside the equipment's working hours.
+  No overlap with another booking.
+end note
+
+note bottom of UC_Signup
+  signup_policy = open: new account enabled.
+  = whitelist: enabled if the email domain is
+    in whitelisted_email_domains.
+  = closed: created disabled for approval.
+  ADMIN_EMAIL bypasses the policy.
+  Existing users keep their disabled status.
+end note
+
+note bottom of UC_PutPerms
+  Administrators cannot remove their own
+  Administrator permission.
+end note
+
+legend right
+  |= Colour |= Meaning |
+  |<#F3EAF7> | <<check>> server-side check run as part of a request |
+  | white | API operation |
+  Every use case except /login, /callback and /whoami
+  includes "Authenticate session cookie", and every
+  request passes "Check CORS / CSRF origin".
+  Every admin route includes "Check Administrator";
+  only some links are drawn to keep the diagram readable.
+endlegend
+
+@enduml
