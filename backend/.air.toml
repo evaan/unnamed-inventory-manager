@@ -11,7 +11,6 @@ tmp_dir = "/tmp/inventory-air"
   stop_on_error = true
   send_interrupt = true
   kill_delay = "500ms"
-  # Docker Desktop bind mounts do not always forward filesystem events.
   poll = true
   poll_interval = 500
 
