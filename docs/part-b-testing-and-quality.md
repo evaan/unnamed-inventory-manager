@@ -4,13 +4,13 @@
 
 All 191 automated tests pass on the integrated system: 85 backend (Go) and 106 frontend (Vitest). Every static check also passes: go vet, gofmt, ESLint, the TypeScript build and the Swagger contract check. The evidence comes from CI run [44962664320](https://github.com/evaan/unnamed-inventory-manager/actions/runs/44962664320) on commit `0c12086` (21 Nov 2026), which is the code now on `main`. The raw output is saved in [`evidence/tests/`](../evidence/tests/) and [`evidence/quality/`](../evidence/quality/).
 
-## B.1 Overview
+## Overview
 
 - **Assignment 1 baseline:** commit `48088a7` (25 Oct 2026, PR #18), the last commit before work on Assignment 2 began. The inventory CRUD tests from `a40ae07` were written in the same period on the `inventory` branch, so they count as Assignment 1 tests here.
 - **New feature:** item categories (tagging). Staff create categories, nest them, move them, delete them, attach them to items and filter by them. The backend part was built in PR #39 (`backend/inventory/*category*.go`) and the frontend part in PR #44 (`ItemTags.tsx`, `categoryHierarchy.ts`, `tagsapi.ts`). It adds the `CreateTag` and `DeleteTag` permissions.
 - **Other integrated changes since Assignment 1:** admin settings and user management (#19, #21, #32), booking permissions and UI (#34, #36), and login required for every inventory read (#45).
 
-## B.2 Regression: Assignment 1 tests on the integrated system
+## Regression: Assignment 1 tests on the integrated system
 
 All 39 Assignment 1 tests that still apply run on the integrated system, and all of them pass. The team's approach was to keep the Assignment 1 tests and add new ones for each new page and feature: 152 of today's 191 tests are new. A few older tests were edited where the feature they check was redesigned. Those edits are listed below so this regression evidence can be checked against the git history:
 
@@ -57,7 +57,7 @@ Commit `1521776` (PR #38, "Cleanup deployment and actions") retired 16 of the 17
 
 The boundary test and the two failure-path tests were retired without a replacement. They are listed as gaps in B.5, and restoring them is recommended.
 
-## B.3 New feature and integration tests
+## New feature and integration tests
 
 The categories feature has 9 backend API tests and 7 frontend tests, and all 16 pass. Each test level was chosen to match a module boundary in the design. The backend tests check the API, the frontend tests check the UI against the API modules, and the Swagger check holds the two sides to the same contract.
 
@@ -104,7 +104,7 @@ The Go packages have no separate unit tests (CI reports `[no test files]` for `a
 3. **Handler to GORM to schema.** Tests run the real `database.Migrate` and check rows directly in the database.
 4. **Frontend API modules to backend JSON.** The Swagger contract check covers this. The page tests mock this boundary, and `itemsapi.test.ts`, which tested it, was removed in #28. This is the weakest link (see B.5).
 
-## B.4 Quality assurance beyond testing
+## Quality assurance beyond testing
 
 The team used two complementary techniques: code review through pull requests, and automated checks that run on every push and block the merge. Review catches design, readability and security problems that tools can't judge. The automated checks give a small team working on short feature branches fast, consistent feedback without waiting for a reviewer. Before reaching `main`, the checks caught a contract drift, two lint errors and a broken build.
 
@@ -126,10 +126,6 @@ The team used two complementary techniques: code review through pull requests, a
 - **Code coverage tools.** Not configured. CI runs `go test -v` and `vitest run` without coverage flags. Thoroughness is argued by traceability instead (B.5).
 - **Dependency vulnerability scanning** (`govulncheck`, `bun audit`, Dependabot). Not set up. These are cheap to add, and they are the next thing we would add.
 - **Browser end-to-end tests** (Playwright). Sign-in goes through Google OAuth, which would need a test Google account or an auth bypass in CI. We judged that too costly for this iteration, and the deployed stack was checked by hand instead (`evidence/deployment/healthcheck.txt`).
-
-## B.5 Thoroughness
-
-We measure thoroughness by traceability, not by line coverage. Every rule in the design traces to at least one test that would fail if the rule broke: every API route, every permission and every requirement of the categories feature. 21 of the 24 API routes and all 10 permissions have such a test. All 7 category requirements are covered at the API level. We chose this measure because the main risk in this system is a permission or contract mistake at a module boundary. A coverage percentage can look high while missing exactly those mistakes, and the coverage tools aren't configured in CI.
 
 ### API routes (`backend/routes/routes.go`)
 
@@ -160,19 +156,7 @@ All 10 permissions have a backend test that grants them and, except for the book
 | Filter items by category, including subcategories | `TestGetCategories` (hierarchy data) | `nests a category… includes it in its parent filter`, `keeps categories read-only… still allows filtering` |
 | Only signed-in, enabled users can read categories | `TestInventoryReadsRequireActiveSession` | `keeps categories read-only without permissions…` |
 
-### Known gaps, ranked by risk
-
-| Gap | Risk | Proposed fix |
-| --- | --- | --- |
-| Nothing automated tests the frontend API modules (`itemsapi.ts`, `tagsapi.ts`) against the real backend JSON. Only the Swagger check stands in. | Medium: a renamed field would pass both test suites and break production | Bring back an `itemsapi.test.ts`/`tagsapi.test.ts` that stubs `fetch` with fixtures taken from `swagger.json` |
-| The UI behaviour when an adjust or delete request fails is untested (tests retired in #38) | Medium: a user might not see that a change failed | Restore the two retired tests |
-| Tests run on SQLite, but production runs PostgreSQL 19 | Low to medium: differences in SQL behaviour, such as cascades and case sensitivity | Run the backend suite in CI against a `postgres:19-alpine` service container |
-| The stock 10/11 boundary is no longer tested | Low | Restore the retired boundary test |
-| OAuth `/login` and `/callback` have no automated test | Low: checked by hand on every deploy | Test `/callback` against a fake OAuth token server |
-
-If a coverage figure is required, it can be added cheaply: `go test ./... -coverpkg=./... -cover` and `vitest run --coverage`. We did not do this for this report.
-
-## B.6 Test output and quality check results
+## Test output and quality check results
 
 Every check passed on CI run [44962664320](https://github.com/evaan/unnamed-inventory-manager/actions/runs/44962664320) (commit `0c12086`, 21 Nov 2026, GitHub-hosted `ubuntu-latest`, Go stable, Bun 1). The output below is copied from the job logs, with timestamps and colour codes removed. The full logs are on the run page and saved in [`evidence/tests/`](../evidence/tests/) and [`evidence/quality/`](../evidence/quality/).
 
