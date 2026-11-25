@@ -16,6 +16,93 @@ definitions:
     required:
     - permissions
     type: object
+  bookings.BookingDTO:
+    properties:
+      end:
+        type: string
+      equipmentID:
+        type: integer
+      id:
+        type: integer
+      mine:
+        type: boolean
+      purpose:
+        type: string
+      start:
+        type: string
+      userName:
+        type: string
+    type: object
+  bookings.BookingReq:
+    properties:
+      End:
+        type: string
+      EquipmentID:
+        type: integer
+      Purpose:
+        type: string
+      Start:
+        type: string
+    required:
+    - End
+    - EquipmentID
+    - Start
+    type: object
+  bookings.Equipment:
+    properties:
+      category:
+        type: string
+      closeHour:
+        description: local hour the equipment closes, 1-24
+        type: integer
+      description:
+        type: string
+      id:
+        type: integer
+      location:
+        type: string
+      maintenanceNote:
+        type: string
+      name:
+        type: string
+      openHour:
+        description: local hour the equipment opens, 0-23
+        type: integer
+      status:
+        $ref: '#/definitions/bookings.EquipmentStatus'
+    type: object
+  bookings.EquipmentReq:
+    properties:
+      Category:
+        type: string
+      CloseHour:
+        type: integer
+      Description:
+        type: string
+      Location:
+        type: string
+      MaintenanceNote:
+        type: string
+      Name:
+        type: string
+      OpenHour:
+        type: integer
+      Status:
+        $ref: '#/definitions/bookings.EquipmentStatus'
+    required:
+    - Category
+    - Location
+    - Name
+    - Status
+    type: object
+  bookings.EquipmentStatus:
+    enum:
+    - ACTIVE
+    - MAINTENANCE
+    type: string
+    x-enum-varnames:
+    - EquipmentActive
+    - EquipmentMaintenance
   inventory.CreateItemCategoryReq:
     properties:
       categoryName:
@@ -108,6 +195,136 @@ info:
   title: Unnamed Inventory Manager API
   version: "1.0"
 paths:
+  /bookings:
+    get:
+      description: Get current and upcoming bookings for all equipment, plus bookings
+        that ended in the last 24 hours. Mine is true for the logged-in user's bookings
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Bookings
+          schema:
+            properties:
+              bookings:
+                items:
+                  $ref: '#/definitions/bookings.BookingDTO'
+                type: array
+            type: object
+        "401":
+          description: Not logged in
+        "500":
+          description: Error retrieving bookings
+      summary: Get bookings
+      tags:
+      - Booking
+    post:
+      consumes:
+      - application/json
+      description: Books equipment for the logged-in user. The slot must be in the
+        future, within the next 7 days and the equipment's working hours, at most
+        8 hours (including back-to-back bookings by the same user), and must not overlap
+        another booking
+      parameters:
+      - description: Equipment, start and end time (RFC 3339) and purpose
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/bookings.BookingReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Booking created
+          schema:
+            properties:
+              booking:
+                $ref: '#/definitions/bookings.BookingDTO'
+            type: object
+        "400":
+          description: Invalid request body, or the slot breaks a booking rule
+        "401":
+          description: Not logged in
+        "404":
+          description: Equipment not found
+        "409":
+          description: The slot overlaps an existing booking
+        "500":
+          description: Error creating booking
+      summary: Book equipment
+      tags:
+      - Booking
+  /bookings/{id}:
+    delete:
+      description: Cancels a booking. Allowed for the booking's owner or users with
+        BookingManage
+      parameters:
+      - description: Booking ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: Booking cancelled
+        "400":
+          description: Invalid booking ID
+        "401":
+          description: Not logged in
+        "403":
+          description: Not the owner and missing BookingManage
+        "404":
+          description: Booking not found
+        "500":
+          description: Error cancelling booking
+      summary: Cancel booking
+      tags:
+      - Booking
+    put:
+      consumes:
+      - application/json
+      description: Changes a booking's equipment, time or purpose. Allowed for the
+        booking's owner or users with BookingManage. The booking keeps its owner and
+        follows the same rules as a new booking
+      parameters:
+      - description: Booking ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Equipment, start and end time (RFC 3339) and purpose
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/bookings.BookingReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Booking updated
+          schema:
+            properties:
+              booking:
+                $ref: '#/definitions/bookings.BookingDTO'
+            type: object
+        "400":
+          description: Invalid booking ID or request body, or the slot breaks a booking
+            rule
+        "401":
+          description: Not logged in
+        "403":
+          description: Not the owner and missing BookingManage
+        "404":
+          description: Booking or equipment not found
+        "409":
+          description: The slot overlaps an existing booking
+        "500":
+          description: Error updating booking
+      summary: Update booking
+      tags:
+      - Booking
   /callback:
     get:
       description: |-
@@ -268,6 +485,119 @@ paths:
       summary: Move an item category
       tags:
       - Category
+  /equipment:
+    get:
+      description: Get all bookable equipment
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Bookable equipment
+          schema:
+            properties:
+              equipment:
+                items:
+                  $ref: '#/definitions/bookings.Equipment'
+                type: array
+            type: object
+        "401":
+          description: Not logged in
+        "500":
+          description: Error retrieving equipment
+      summary: Get equipment
+      tags:
+      - Booking
+    post:
+      consumes:
+      - application/json
+      description: Adds bookable equipment. Requires BookingAdd
+      parameters:
+      - description: Equipment details. Missing hours use the category default
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/bookings.EquipmentReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Equipment created
+          schema:
+            properties:
+              equipment:
+                $ref: '#/definitions/bookings.Equipment'
+            type: object
+        "400":
+          description: Invalid request body
+        "403":
+          description: Missing BookingAdd permission
+        "500":
+          description: Error creating equipment
+      summary: Add equipment
+      tags:
+      - Booking
+  /equipment/{id}:
+    delete:
+      description: Deletes bookable equipment and all of its bookings. Requires BookingDelete
+      parameters:
+      - description: Equipment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: Equipment deleted
+        "400":
+          description: Invalid equipment ID
+        "403":
+          description: Missing BookingDelete permission
+        "404":
+          description: Equipment not found
+        "500":
+          description: Error deleting equipment
+      summary: Delete equipment
+      tags:
+      - Booking
+    put:
+      consumes:
+      - application/json
+      description: Replaces bookable equipment details. Requires BookingModify. Existing
+        bookings are kept
+      parameters:
+      - description: Equipment ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Equipment details. Missing hours use the category default
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/bookings.EquipmentReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Equipment updated
+          schema:
+            properties:
+              equipment:
+                $ref: '#/definitions/bookings.Equipment'
+            type: object
+        "400":
+          description: Invalid equipment ID or request body
+        "403":
+          description: Missing BookingModify permission
+        "404":
+          description: Equipment not found
+        "500":
+          description: Error updating equipment
+      summary: Update equipment
+      tags:
+      - Booking
   /items:
     get:
       consumes:
