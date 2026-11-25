@@ -565,6 +565,34 @@ describe('MainPage: category permissions', () => {
     expect(updateItem).not.toHaveBeenCalled();
   });
 
+  it.each([true, false])('preserves child categories when deleting a category (nested: %s)', async (nested) => {
+    setPermissions(['DeleteTag']);
+    const top = { ID: 'top', Name: 'Top' };
+    const middle = { ID: 'middle', Name: 'Middle', ParentID: nested ? top.ID : null };
+    const bottom = { ID: 'bottom', Name: 'Bottom', ParentID: middle.ID };
+    const descendant = { ID: 'descendant', Name: 'Descendant', ParentID: bottom.ID };
+    vi.mocked(getTags).mockResolvedValue(nested ? [top, middle, bottom, descendant] : [middle, bottom, descendant]);
+    vi.mocked(deleteTag).mockResolvedValue(undefined);
+    await renderPage([makeItem({ Tags: [middle, bottom] }), ITEMS[1]]);
+
+    const deletedPath = nested ? 'Top › Middle' : 'Middle';
+    await userEvent.click(screen.getByRole('button', { name: `Delete category ${deletedPath}` }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(nested
+      ? 'Its direct subcategories will move under "Top".'
+      : 'Its direct subcategories will become top-level categories.');
+    await userEvent.click(screen.getByRole('button', { name: 'Delete category' }));
+
+    const bottomPath = nested ? 'Top › Bottom' : 'Bottom';
+    expect(await screen.findByRole('button', { name: `${bottomPath}, 1 item` })).toBeVisible();
+    expect(screen.getByRole('button', { name: `${bottomPath} › Descendant, 0 items` })).toBeVisible();
+    expect(screen.queryByRole('button', { name: `Delete category ${deletedPath}` })).not.toBeInTheDocument();
+    expect(deleteTag).toHaveBeenCalledWith(middle.ID);
+    await userEvent.click(screen.getByRole('button', { name: nested ? 'Top, 1 item' : 'Bottom, 1 item' }));
+    expect(screen.getByText('1 of 2')).toBeVisible();
+    expect(screen.getByRole('button', { name: /resistor 4\.7k/i })).toBeVisible();
+    expect(updateItem).not.toHaveBeenCalled();
+  });
+
   it('assigns an existing category with ModifyItem permission', async () => {
     setPermissions(['ModifyItem']);
     vi.mocked(updateItem).mockResolvedValue({ ...taggedItem, Tags: [resistorTag, sensorTag] });

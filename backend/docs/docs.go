@@ -347,7 +347,7 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "description": "Removes the category from all items and makes its direct children top-level categories. Requires DeleteTag or Administrator.",
+                "description": "Removes the category from all items and moves its direct children to its parent, or to the top level if it has no parent. Requires DeleteTag or Administrator.",
                 "tags": [
                     "Category"
                 ],

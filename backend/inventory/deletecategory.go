@@ -11,7 +11,7 @@ import (
 )
 
 // @Summary		Delete an item category
-// @Description	Removes the category from all items and makes its direct children top-level categories. Requires DeleteTag or Administrator.
+// @Description	Removes the category from all items and moves its direct children to its parent, or to the top level if it has no parent. Requires DeleteTag or Administrator.
 // @Tags			Category
 // @Param			id		path	string	true	"Item Category ID"	Format(uuid)
 // @Success		204		"Category deleted"
@@ -36,7 +36,7 @@ func DeleteCategory(c *gin.Context, db *gorm.DB) {
 		if err := tx.Exec("DELETE FROM item_category_links WHERE item_category_id = ?", id).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&ItemCategory{}).Where("parent_id = ?", id).Update("parent_id", nil).Error; err != nil {
+		if err := tx.Model(&ItemCategory{}).Where("parent_id = ?", id).Update("parent_id", category.ParentID).Error; err != nil {
 			return err
 		}
 		return tx.Delete(&category).Error
