@@ -1,0 +1,188 @@
+@startuml frontend-use-case
+' Frontend use case diagram (React single-page app).
+'
+' Shows what each kind of user can do through the screens of the web app:
+' Login, Disabled notice, Inventory (MainPage), Bookings and Settings.
+' The UI hides controls the user lacks permission for, but the backend makes the
+' final decision (see backend-use-case.puml).
+'
+' Actors that hold permissions are specialisations of "User". A real account can
+' hold any combination of permissions. Administrator passes every permission
+' check, so it inherits every role.
+' Use cases marked <<client>> run entirely in the browser and make no API call.
+' Every other use case calls the Backend API.
+
+title Unnamed Inventory Manager: Frontend Use Case Diagram
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor<<client>> #EAF5EA
+  BorderColor<<client>> #3C7A3C
+}
+
+' ---------------------------------------------------------------- actors
+actor "Visitor\n(not logged in)" as Visitor
+actor "Disabled User" as Disabled
+actor "User\n(enabled account)" as User
+actor "Item Editor\n(CreateItem / ModifyItem /\nDeleteItem)" as ItemEditor
+actor "Category Manager\n(CreateTag / DeleteTag)" as CategoryManager
+actor "Equipment Manager\n(BookingAdd / BookingModify /\nBookingDelete)" as EquipmentManager
+actor "Booking Manager\n(BookingManage)" as BookingManager
+actor "Administrator" as Admin
+actor "Google sign-in page" as Google <<external system>>
+
+ItemEditor -|> User
+CategoryManager -|> User
+EquipmentManager -|> User
+BookingManager -|> User
+Admin -|> ItemEditor
+Admin -|> CategoryManager
+Admin -|> EquipmentManager
+Admin -|> BookingManager
+
+rectangle "Web frontend (React)" {
+
+  ' ------------------------------------------------ login page / shell
+  package "Login & Session" {
+    usecase "Log in with Google" as UC_Login
+    usecase "Redirect to\nGoogle sign-in" as UC_Redirect
+    usecase "Route to page for\nsession state" as UC_Route
+    usecase "View disabled-account\nnotice" as UC_DisabledNotice
+    usecase "Log out" as UC_Logout
+    usecase "Toggle light / dark theme" as UC_Theme <<client>>
+  }
+
+  ' ------------------------------------------------ MainPage
+  package "Inventory page" {
+    usecase "Browse items" as UC_Browse
+    usecase "Search items" as UC_Search <<client>>
+    usecase "Filter items by category" as UC_Filter <<client>>
+    usecase "View item details\nand stock level" as UC_ViewItem
+    usecase "Create item" as UC_CreateItem
+    usecase "Edit item details" as UC_EditItem
+    usecase "Edit stock quantity" as UC_Stock
+    usecase "Assign categories\nto item" as UC_AssignCat
+    usecase "Delete item" as UC_DeleteItem
+    usecase "Confirm action" as UC_Confirm <<client>>
+    usecase "Confirm discarding\nunsaved changes" as UC_Unsaved <<client>>
+    usecase "Create category" as UC_CreateCat
+    usecase "Move category\n(change parent)" as UC_MoveCat
+    usecase "Delete category" as UC_DeleteCat
+  }
+
+  ' ------------------------------------------------ BookingsPage
+  package "Bookings page" {
+    usecase "View equipment schedule" as UC_Schedule
+    usecase "Filter equipment\n(category / available now)" as UC_FilterEq <<client>>
+    usecase "Book equipment" as UC_Book
+    usecase "Pre-check booking slot\n(friendlier errors)" as UC_PreCheck <<client>>
+    usecase "View my bookings" as UC_MyBookings
+    usecase "View reservation details" as UC_ResDetails
+    usecase "Modify own reservation" as UC_ModifyOwn
+    usecase "Cancel own reservation" as UC_CancelOwn
+    usecase "View all bookings" as UC_AllBookings
+    usecase "Modify / cancel another\nuser's reservation" as UC_ManageOthers
+    usecase "Add equipment" as UC_AddEq
+    usecase "Edit equipment\n(details, hours, maintenance)" as UC_EditEq
+    usecase "Remove equipment\n(and its reservations)" as UC_RemoveEq
+  }
+
+  ' ------------------------------------------------ SettingsPage
+  package "Settings page" {
+    usecase "View account details" as UC_Account
+    usecase "View users" as UC_Users
+    usecase "Search users" as UC_SearchUsers <<client>>
+    usecase "Edit user permissions" as UC_Perms
+    usecase "Enable / disable user" as UC_Disable
+    usecase "View application settings" as UC_Settings
+    usecase "Set signup policy\n(open / whitelist / closed)" as UC_Policy
+    usecase "Edit whitelisted\nemail domains" as UC_Domains
+  }
+}
+
+' ================================================================ actor links
+
+Visitor --> UC_Login
+Visitor --> UC_Theme
+UC_Login .> UC_Redirect : <<include>>
+UC_Redirect -- Google
+
+Disabled --> UC_DisabledNotice
+Disabled --> UC_Logout
+Disabled --> UC_Theme
+
+User --> UC_Logout
+User --> UC_Theme
+User --> UC_Account
+User --> UC_Browse
+User --> UC_ViewItem
+User --> UC_Schedule
+User --> UC_Book
+User --> UC_MyBookings
+User --> UC_ResDetails
+User --> UC_ModifyOwn
+User --> UC_CancelOwn
+
+ItemEditor --> UC_CreateItem
+ItemEditor --> UC_EditItem
+ItemEditor --> UC_Stock
+ItemEditor --> UC_DeleteItem
+
+CategoryManager --> UC_CreateCat
+CategoryManager --> UC_MoveCat
+CategoryManager --> UC_DeleteCat
+
+EquipmentManager --> UC_AddEq
+EquipmentManager --> UC_EditEq
+EquipmentManager --> UC_RemoveEq
+
+BookingManager --> UC_AllBookings
+BookingManager --> UC_ManageOthers
+
+Admin --> UC_Users
+Admin --> UC_Perms
+Admin --> UC_Disable
+Admin --> UC_Settings
+Admin --> UC_Policy
+Admin --> UC_Domains
+
+' ================================================================ include / extend
+
+UC_Route .> UC_DisabledNotice : <<include>>\n[account disabled]
+
+UC_Search .> UC_Browse : <<extend>>
+UC_Filter .> UC_Browse : <<extend>>
+UC_AssignCat .> UC_CreateItem : <<extend>>
+UC_AssignCat .> UC_EditItem : <<extend>>
+UC_CreateCat .> UC_AssignCat : <<extend>>\n[new tag name]
+UC_Unsaved .> UC_EditItem : <<extend>>\n[navigate away while dirty]
+UC_DeleteItem .> UC_Confirm : <<include>>
+UC_DeleteCat .> UC_Confirm : <<include>>
+
+UC_FilterEq .> UC_Schedule : <<extend>>
+UC_Book .> UC_PreCheck : <<include>>
+UC_ModifyOwn .> UC_PreCheck : <<include>>
+UC_ManageOthers .> UC_PreCheck : <<include>>
+UC_CancelOwn .> UC_Confirm : <<include>>
+UC_RemoveEq .> UC_Confirm : <<include>>
+
+UC_ManageOthers .> UC_Confirm : <<include>>\n[cancel]
+UC_Perms .> UC_Confirm : <<include>>\n[removing Administrator]
+
+UC_SearchUsers .> UC_Users : <<extend>>
+UC_Domains .> UC_Policy : <<extend>>\n[policy = whitelist]
+
+note bottom of UC_Route
+  On load the app calls GET /whoami and sends the
+  user to the login page, the disabled notice or
+  the app, depending on the session.
+end note
+
+legend right
+  |= Colour |= Meaning |
+  |<#EAF5EA> | <<client>> runs in the browser only, no API call |
+  | white | calls the Backend API |
+endlegend
+
+@enduml
