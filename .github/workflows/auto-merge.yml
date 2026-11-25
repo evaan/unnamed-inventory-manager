@@ -33,4 +33,4 @@ jobs:
             echo "No open PR to main; skipping auto-merge."
             exit 0
           fi
-          gh pr merge "$pr_number" --repo "$GITHUB_REPOSITORY" --squash --delete-branch --auto
+          gh pr merge "$pr_number" --repo "$GITHUB_REPOSITORY" --squash --delete-branch
