@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus } from 'lucide-react';
+import { History, Plus } from 'lucide-react';
 import { useAuth } from '../features/auth/useAuth';
 import { hasPermission } from '../features/auth/auth';
 import {
@@ -22,6 +22,7 @@ import { SearchInput } from '../components/SearchInput';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { ListSkeleton } from '../components/ListSkeleton';
 import { ItemDetails } from '../features/items/ItemDetails';
+import { ChangelogWindow } from '../features/items/ChangelogWindow';
 import { getCategoryHierarchy } from '../features/items/categoryHierarchy';
 import { getStock, STOCK_STYLES } from '../features/items/itemStock';
 import { useInventoryData } from '../features/items/useInventoryData';
@@ -72,6 +73,7 @@ export const MainPage = () => {
   const [formVersion, setFormVersion] = useState(0);
   const canLeave = useUnsavedChanges(dirty, saving);
   const [query, setQuery] = useState('');
+  const [changelogOpen, setChangelogOpen] = useState(false);
 
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [activeTagIds, setActiveTagIds] = useState<TagID[]>([]);
@@ -369,6 +371,10 @@ export const MainPage = () => {
           <span className="ml-auto text-xs text-slate-400 shrink-0 tabular-nums">
             {visibleItems.length} of {items.length}
           </span>
+          <button type="button" onClick={() => setChangelogOpen(true)} className="ui-button-secondary">
+            <History className="h-4 w-4" aria-hidden="true" />
+            Changelog
+          </button>
           {canCreateItem && (
             <button
               onClick={addItem}
@@ -504,6 +510,7 @@ export const MainPage = () => {
           />
         )}
       </DetailPanel>
+      {changelogOpen && <ChangelogWindow onClose={() => setChangelogOpen(false)} />}
     </Workspace>
   );
 };
