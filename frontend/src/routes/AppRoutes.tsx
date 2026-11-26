@@ -3,6 +3,7 @@ import { LoginPage } from '../pages/LoginPage';
 import { MainPage } from '../pages/MainPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { BookingsPage } from '../pages/BookingsPage';
+import { ChangelogPage } from '../pages/ChangelogPage';
 import { DisabledPage } from '../pages/DisabledPage';
 import AppLayout from '../layout/AppLayout';
 import { useAuth } from '../features/auth/useAuth';
@@ -60,6 +61,7 @@ function SessionRoutes() {
         <Route path="account" element={<Navigate to="/app/settings" replace />} />
         <Route path="settings/*" element={<SettingsPage />} />
         <Route path="bookings" element={<BookingsPage />} />
+        <Route path="changelog" element={<ChangelogPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to={destination} replace />} />

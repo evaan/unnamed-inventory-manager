@@ -10,6 +10,7 @@ export interface ChangelogEntry {
   Action: 'CREATE' | 'ADDED' | 'TAKEN' | 'MODIFIED' | 'DELETE';
   ChangeTime: string;
   Description: string;
+  Changes?: { Field: string; Before: string; After: string }[] | null;
 }
 
 export const getLogs = async (): Promise<ChangelogEntry[]> => {

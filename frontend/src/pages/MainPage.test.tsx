@@ -8,7 +8,6 @@ import { ConfirmProvider } from '../components/ConfirmProvider';
 import { useAuth, useLogout } from '../features/auth/useAuth';
 import { getItems, createItem, adjustItem, deleteItem, updateItem, type Item } from '../features/items/itemsapi';
 import { getTags, createTag, deleteTag, moveTag } from '../features/items/tagsapi';
-import { getLogs, type ChangelogEntry } from '../features/items/changelogapi';
 
 // Mock both feature modules so tests never touch the network or the other teams' services.
 vi.mock('../features/auth/useAuth', () => ({
@@ -28,7 +27,6 @@ vi.mock('../features/items/tagsapi', () => ({
   deleteTag: vi.fn(),
   moveTag: vi.fn(),
 }));
-vi.mock('../features/items/changelogapi', () => ({ getLogs: vi.fn() }));
 
 const makeItem = (overrides: Partial<Item> = {}): Item => ({
   id: '1',
@@ -89,48 +87,6 @@ describe('MainPage: auth gate', () => {
     const { container } = renderMain();
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
-});
-
-describe('MainPage: changelog', () => {
-  beforeEach(() => {
-    vi.mocked(useAuth).mockReturnValue({
-      data: { loggedIn: true, disabled: false, name: 'Taylor', email: 'taylor@example.com', permissions: [] },
-    } as never);
-  });
-
-  const entry: ChangelogEntry = {
-    ID: 1,
-    UserID: 'user-1',
-    UserName: 'Alex',
-    ItemID: 'deleted-item',
-    Item: { ItemName: 'Old resistor', DeletedAt: '2026-11-24T12:00:00Z' },
-    Quantity: -2,
-    Action: 'TAKEN',
-    ChangeTime: '2026-11-23T10:00:00Z',
-    Description: 'Used for a prototype',
-  };
-
-  it('lets a reader open, refresh and close the changelog without modification permissions', async () => {
-    vi.mocked(getLogs).mockResolvedValue([entry]);
-    await renderPage();
-    expect(getLogs).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: 'Changelog' }));
-    const dialog = within(screen.getByRole('dialog', { name: 'Inventory changelog' }));
-    expect(await dialog.findByText('Old resistor')).toBeVisible();
-    expect(dialog.getByText('(deleted item)')).toBeVisible();
-    expect(dialog.getByText('Alex · Stock taken')).toBeVisible();
-    expect(dialog.getByLabelText('Quantity change: -2')).toBeVisible();
-    expect(dialog.getByText('Used for a prototype')).toBeVisible();
-    expect(dialog.getByText(new Date(entry.ChangeTime).toLocaleString())).toHaveAttribute('datetime', entry.ChangeTime);
-    vi.mocked(getLogs).mockResolvedValue([{ ...entry, ID: 2, Quantity: 3, Action: 'ADDED', Description: 'New delivery' }]);
-    await userEvent.click(dialog.getByRole('button', { name: 'Refresh' }));
-    expect(await dialog.findByText('New delivery')).toBeVisible();
-    expect(dialog.getByLabelText('Quantity change: +3')).toBeVisible();
-    await userEvent.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Changelog' })).toHaveFocus();
-  });
-
 });
 
 describe('MainPage: loading and listing', () => {

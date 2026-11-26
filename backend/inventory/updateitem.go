@@ -58,7 +58,7 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 	}
 
 	var item Item
-	if err := db.First(&item, "id = ?", id).Error; err != nil {
+	if err := db.Preload("Categories").First(&item, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Item not found",
@@ -71,7 +71,13 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 		})
 		return
 	}
-	oldQuantity := item.Quantity
+	before := item
+	// GORM can update pointed-to values in place, so preserve the original threshold.
+	if item.LowStockThreshold != nil {
+		threshold := *item.LowStockThreshold
+		before.LowStockThreshold = &threshold
+	}
+	before.Categories = append([]ItemCategory(nil), item.Categories...)
 
 	var req UpdateItemReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -123,10 +129,6 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 		}
 	}
 
-	if req.Quantity == nil {
-		req.Quantity = &item.Quantity
-	}
-
 	if err := db.Model(&item).Updates(newItem).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to update item",
@@ -134,8 +136,15 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 		return
 	}
 
+	if err := db.Preload("Categories").First(&item, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to retrieve updated item",
+		})
+		return
+	}
+
 	// Add to changelog
-	deltaQ := *req.Quantity - oldQuantity
+	deltaQ := item.Quantity - before.Quantity
 	action := ItemModified
 	if deltaQ > 0 {
 		action = ItemAdded
@@ -152,19 +161,12 @@ func UpdateItem(c *gin.Context, db *gorm.DB) {
 		Quantity:    deltaQ,
 		Action:      action,
 		ChangeTime:  time.Now(),
-		Description: *req.LogDescription}
+		Description: *req.LogDescription,
+		Changes:     itemChanges(before, item)}
 
 	if err := db.Create(&log).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to create changelog",
-		})
-		return
-	}
-
-	// Return item
-	if err := db.Preload("Categories").First(&item, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to retrieve updated item",
 		})
 		return
 	}

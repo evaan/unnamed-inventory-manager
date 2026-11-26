@@ -31,6 +31,13 @@ type Changelog struct {
 	Action      ChangelogAction `gorm:"type:varchar(20);not null"`
 	ChangeTime  time.Time       `gorm:"not null"`
 	Description string
+	Changes     []FieldChange `gorm:"serializer:json"`
+}
+
+type FieldChange struct {
+	Field  string
+	Before string
+	After  string
 }
 
 type ChangelogAction string
