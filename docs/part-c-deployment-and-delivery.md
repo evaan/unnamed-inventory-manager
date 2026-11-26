@@ -49,7 +49,7 @@ Design decisions:
 
 - **Check both parts before merging.** The backend workflow builds, tests, checks formatting, runs `go vet` and checks the Swagger files. The frontend workflow builds, lints and tests. All jobs use GitHub-hosted `ubuntu-latest` runners.
 - **Merge only an existing PR.** `merge-to-main` waits for both workflows, looks for an open PR from the branch into `main`, then squash-merges it and deletes the branch. If there is no PR, it skips the merge.
-- **Build the containers on the host.** Deployment is a separate manual step: update the checkout on the server and run `docker compose up -d --build`. The frontend and backend are rebuilt from source. Although Compose has GHCR image names, there is no current workflow that builds or publishes those images.
+- **Build the containers on the host.** Deployment is a separate manual step: update the checkout on the server and run `docker compose up -d --build`. The frontend and backend are rebuilt from source as `sdh-frontend` and `sdh-backend`.
 - **Check the running stack.** `scripts/healthcheck.sh` requests the frontend and `/api/whoami`, checking for HTTP 200 and the expected response content. It can retry five seconds apart, but CI does not run it or roll back a failed deployment.
 
 The saved deployment check in `evidence/deployment/healthcheck.txt` shows that the public frontend and `/api/whoami` both returned HTTP 200 on 21 Nov. It is evidence of that check, not of an automated release pipeline.

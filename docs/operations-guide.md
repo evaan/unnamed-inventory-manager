@@ -8,11 +8,11 @@ The system runs as a Docker Compose stack on a single Linux host. Cloudflare sit
 |---------|-------|------|
 | `traefik` | `traefik:v3` | Reverse proxy. `/api/*` goes to the backend with the prefix stripped, and everything else goes to the frontend. |
 | `docker-socket-proxy` | `tecnativa/docker-socket-proxy:lts` | Gives Traefik read-only access to the Docker API on an internal network (POST disabled). |
-| `frontend` | `ghcr.io/evaan/unnamed-inventory-manager/frontend:${IMAGE_TAG:-local}` | nginx (unprivileged) serving the React build |
-| `backend` | `ghcr.io/evaan/unnamed-inventory-manager/backend:${IMAGE_TAG:-local}` | Go server in a distroless, non-root image |
+| `frontend` | `sdh-frontend` | nginx (unprivileged) serving the React build |
+| `backend` | `sdh-backend` | Go server in a distroless, non-root image |
 | `postgres` | `postgres:19-alpine` | Database. Data is kept in `./postgres-data` on the host. |
 
-The frontend and backend have image names under GHCR, but the current workflows do not publish them. Build them on the host with `docker compose up -d --build`, using `frontend/Dockerfile` and `backend/Dockerfile`. If `IMAGE_TAG` is unset, the local builds use the tag `local`.
+Build the frontend and backend images on the host with `docker compose up -d --build`, using `frontend/Dockerfile` and `backend/Dockerfile`. Compose names them `sdh-frontend` and `sdh-backend`.
 
 ## How a change reaches production
 
