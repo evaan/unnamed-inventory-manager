@@ -25,7 +25,9 @@ describe('PageHeader', () => {
     const navigation = within(screen.getByRole('navigation', { name: 'Main navigation' }));
     expect(navigation.getByRole('link', { name: 'Inventory' })).toHaveAttribute('href', '/app');
     expect(navigation.getByRole('link', { name: 'Bookings' })).toHaveAttribute('href', '/app/bookings');
+    expect(navigation.getByRole('link', { name: 'Changelog' })).toHaveAttribute('href', '/app/changelog');
     expect(navigation.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/app/settings');
+    expect(navigation.getAllByRole('link').map((link) => link.textContent)).toEqual(['Inventory', 'Bookings', 'Changelog', 'Settings']);
   });
 
   it('logs out through the existing mutation', async () => {
