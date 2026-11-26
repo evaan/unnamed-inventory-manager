@@ -6,7 +6,7 @@ This guide is for SDH staff and students who use the inventory manager day to da
 
 1. Go to https://inventory.evaan.dev.
 2. Click Continue with Google and choose your MUN Google account.
-3. If your account is new and your email domain is approved (by default `mun.ca`), you are signed in and taken to the inventory.
+3. New accounts follow the app's sign-up policy. By default, accounts with a `mun.ca` email address are enabled and taken to the inventory.
 4. If you see Account disabled, an administrator has not approved your account, or has disabled it. Contact SDH staff to have it enabled.
 
 The app never sees your password. Google handles sign-in.
@@ -15,9 +15,11 @@ The app never sees your password. Google handles sign-in.
 
 The main page lists every item with its name, quantity and stock status:
 
-- In stock: more than 10
-- Low stock: 1 to 10
+- In stock: above the item's low stock threshold
+- Low stock: above 0, at or below the threshold
 - Out of stock: 0
+
+The threshold starts at 10 and can be changed for each item. Set it to 0 to only flag out-of-stock items.
 
 Search. Type in the search box to filter by item name or manufacturer part number. Click Clear search to show everything again.
 
@@ -27,23 +29,31 @@ Item details. Click a row to open the details panel. It shows the manufacturer, 
 
 ## Changing stock
 
-Select an item and use the +1 / +10 / −1 / −10 buttons. The quantity cannot go below zero. Every change is recorded in the changelog with your name and the time.
+With ModifyItem permission, select an item and use the +1 / +10 / −1 / −10 buttons, or click the quantity to enter an exact number and save it. The quantity cannot go below zero. Every change is recorded in the changelog with your name and the time.
 
 ## Adding, editing and deleting items
 
 These actions need the matching permission (see *Permissions* below). Buttons you can't use are hidden.
 
 - New item: click New item, fill in at least the name, quantity, manufacturer and manufacturer part number, add categories if needed, and click Add item. If saving fails, your draft stays open so nothing is lost.
-- Edit: open an item and change its details or categories, then save. If you try to leave with unsaved changes, the app asks first.
+- Edit: open an item, click Edit item, and change its details, low stock threshold or categories, then save. Change the quantity separately using the stock controls. If you try to leave with unsaved changes, the app asks first.
 - Delete: open an item and click Delete, then confirm. Deleted items are kept in the database for the changelog but no longer shown.
 
 ## Categories
 
-Users with the CreateTag permission can create categories, nest them under a parent, and move them. Users with DeleteTag can delete a category. Deleting a category removes it from every item.
+Users with the CreateTag permission can create categories, nest them under a parent, and move them. Users with DeleteTag can delete a category. Deleting a category removes it from every item, but does not delete the items or its child categories. Its children move up to its parent, or to the top level if it had no parent.
 
-## Equipment bookings (preview)
+## Changelog
 
-The Bookings page shows bookable equipment (3D printers, soldering stations and so on) on a schedule, and lets you reserve time slots. It is a preview: it uses sample data that resets when the page reloads, and nothing is saved yet.
+Open Changelog from the page header to see item changes, who made them and when. Click an entry to see its details, including before and after values where recorded. Deleted items still appear in the history.
+
+## Equipment bookings
+
+The Bookings page shows bookable equipment (3D printers, soldering stations and so on) on a schedule. Select equipment or a free time slot, choose a date, start time and duration, then click Confirm reservation. Reservations are saved and stay after reloading.
+
+Bookings are limited to the next seven days and eight consecutive hours on the same equipment. They must fit its working hours and cannot overlap another booking. Equipment marked out of service cannot be booked.
+
+Use My bookings to edit or cancel your bookings. Users with BookingManage can also manage other users' reservations. Adding, editing and deleting equipment needs the separate BookingAdd, BookingModify and BookingDelete permissions. Deleting equipment also removes its reservations.
 
 ## Settings
 
